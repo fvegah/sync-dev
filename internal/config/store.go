@@ -3,9 +3,12 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"SyncDev/internal/secrets"
 
 	"github.com/google/uuid"
 )
@@ -14,6 +17,7 @@ import (
 type Store struct {
 	configPath string
 	config     *Config
+	secrets    secrets.Manager
 	mu         sync.RWMutex
 }
 
@@ -32,10 +36,16 @@ func NewStore() (*Store, error) {
 	configPath := filepath.Join(configDir, "config.json")
 	store := &Store{
 		configPath: configPath,
+		secrets:    secrets.NewKeychainManager(),
 	}
 
 	if err := store.load(); err != nil {
 		return nil, err
+	}
+
+	if err := store.migrateSecretsToKeychain(); err != nil {
+		log.Printf("Warning: secret migration failed: %v", err)
+		// Don't fail startup - secrets may work from plaintext
 	}
 
 	return store, nil
@@ -128,4 +138,45 @@ func (s *Store) GetIndexPath(folderPairID string) string {
 func (s *Store) EnsureIndexDir() error {
 	indexDir := filepath.Join(s.GetDataDir(), "indices")
 	return os.MkdirAll(indexDir, 0755)
+}
+
+// GetSecrets returns the secrets manager
+func (s *Store) GetSecrets() secrets.Manager {
+	return s.secrets
+}
+
+// migrateSecretsToKeychain moves plaintext secrets from config to keychain
+func (s *Store) migrateSecretsToKeychain() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	migrated := false
+	for _, peer := range s.config.Peers {
+		if peer.SharedSecret == "" || !peer.Paired {
+			continue
+		}
+
+		// Check if already in keychain
+		existing, err := s.secrets.GetSecret(peer.ID)
+		if err == nil && existing != "" {
+			// Already migrated, just clear from config
+			peer.SharedSecret = ""
+			migrated = true
+			continue
+		}
+
+		// Store in keychain
+		if err := s.secrets.SetSecret(peer.ID, peer.SharedSecret); err != nil {
+			return fmt.Errorf("migrate secret for peer %s: %w", peer.ID, err)
+		}
+
+		log.Printf("Migrated secret for peer %s to keychain", peer.Name)
+		peer.SharedSecret = ""
+		migrated = true
+	}
+
+	if migrated {
+		return s.saveUnlocked() // Save config without secrets
+	}
+	return nil
 }
