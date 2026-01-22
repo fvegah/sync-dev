@@ -71,11 +71,13 @@ func (d *Discovery) Stop() {
 
 // startAdvertising begins advertising this device via mDNS
 func (d *Discovery) startAdvertising() error {
-	// Get local IP
-	localIP, err := getLocalIP()
-	if err != nil {
-		return fmt.Errorf("failed to get local IP: %w", err)
+	// Get all local IPs
+	localIPs := getAllLocalIPs()
+	if len(localIPs) == 0 {
+		return fmt.Errorf("no local IPs found")
 	}
+
+	log.Printf("mDNS: Found %d local IPs: %v", len(localIPs), localIPs)
 
 	// Create TXT records with device info
 	txtRecords := []string{
@@ -84,32 +86,32 @@ func (d *Discovery) startAdvertising() error {
 		fmt.Sprintf("version=%s", config.AppVersion),
 	}
 
-	log.Printf("mDNS: Creating service with ID=%s, Name=%s, IP=%s, Port=%d",
-		d.deviceID, d.deviceName, localIP.String(), d.port)
+	log.Printf("mDNS: Creating service with ID=%s, Name=%s, Port=%d",
+		d.deviceID, d.deviceName, d.port)
 	log.Printf("mDNS: TXT records: %v", txtRecords)
 
-	// Create mDNS service
+	// Create mDNS service with all local IPs
 	service, err := mdns.NewMDNSService(
 		d.deviceID,
 		config.ServiceName,
 		"",
 		"",
 		d.port,
-		[]net.IP{localIP},
+		localIPs,
 		txtRecords,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create mDNS service: %w", err)
 	}
 
-	// Get the active interface for multicast
-	iface, _ := getActiveInterface()
-
-	// Create and start server with interface binding
+	// Try without interface binding first (let the library choose)
 	serverConfig := &mdns.Config{Zone: service}
+
+	// Try to get the active interface, but don't fail if we can't
+	iface, _ := getActiveInterface()
 	if iface != nil {
-		serverConfig.Iface = iface
-		log.Printf("mDNS: Using interface %s for advertising", iface.Name)
+		log.Printf("mDNS: Preferred interface: %s", iface.Name)
+		// Note: We're NOT binding to interface to allow broader advertising
 	}
 
 	server, err := mdns.NewServer(serverConfig)
@@ -118,17 +120,66 @@ func (d *Discovery) startAdvertising() error {
 	}
 
 	d.server = server
-	log.Printf("mDNS: Advertising as %s on port %d (IP: %s)", d.deviceName, d.port, localIP.String())
+	log.Printf("mDNS: Advertising as %s on port %d (IPs: %v)", d.deviceName, d.port, localIPs)
 	return nil
+}
+
+// getAllLocalIPs returns all non-loopback local IPs
+func getAllLocalIPs() []net.IP {
+	var ips []net.IP
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return ips
+	}
+
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, addr := range addrs {
+			var ip net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ip = v.IP
+			case *net.IPAddr:
+				ip = v.IP
+			}
+
+			// Only include IPv4 addresses
+			if ip != nil && ip.To4() != nil && !ip.IsLoopback() {
+				ips = append(ips, ip)
+				log.Printf("mDNS: Found IP %s on interface %s", ip.String(), iface.Name)
+			}
+		}
+	}
+
+	return ips
 }
 
 // scanLoop periodically scans for peers
 func (d *Discovery) scanLoop() {
+	// Do aggressive initial scans (3 scans in first 10 seconds)
+	for i := 0; i < 3; i++ {
+		select {
+		case <-d.ctx.Done():
+			return
+		default:
+			log.Printf("mDNS: Initial scan %d/3", i+1)
+			d.scan()
+			time.Sleep(3 * time.Second)
+		}
+	}
+
+	// Then switch to regular interval
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-
-	// Do initial scan immediately
-	d.scan()
 
 	for {
 		select {
@@ -141,8 +192,30 @@ func (d *Discovery) scanLoop() {
 	}
 }
 
-// scan performs a single mDNS scan
+// scan performs a single mDNS scan on all available interfaces
 func (d *Discovery) scan() {
+	// Get all multicast interfaces
+	interfaces := getAllMulticastInterfaces()
+	if len(interfaces) == 0 {
+		log.Printf("mDNS: No multicast interfaces found, trying without interface binding")
+		d.scanOnInterface(nil)
+		return
+	}
+
+	log.Printf("mDNS: Scanning on %d interfaces", len(interfaces))
+
+	// Scan on each interface
+	for _, iface := range interfaces {
+		log.Printf("mDNS: Scanning on interface %s", iface.Name)
+		d.scanOnInterface(iface)
+	}
+
+	// Also try without interface binding as fallback
+	d.scanOnInterface(nil)
+}
+
+// scanOnInterface performs a scan on a specific interface
+func (d *Discovery) scanOnInterface(iface *net.Interface) {
 	entriesCh := make(chan *mdns.ServiceEntry, 10)
 	go func() {
 		for entry := range entriesCh {
@@ -150,23 +223,22 @@ func (d *Discovery) scan() {
 		}
 	}()
 
-	// Get the active network interface
-	iface, err := getActiveInterface()
-	if err != nil {
-		log.Printf("mDNS: Failed to get active interface: %v", err)
+	ifaceName := "default"
+	if iface != nil {
+		ifaceName = iface.Name
 	}
 
 	params := &mdns.QueryParam{
 		Service:             config.ServiceName,
 		Domain:              "local",
-		Timeout:             5 * time.Second,
+		Timeout:             3 * time.Second,
 		Entries:             entriesCh,
 		WantUnicastResponse: false, // Use multicast
 		Interface:           iface,
 	}
 
 	if err := mdns.Query(params); err != nil {
-		log.Printf("mDNS: Query error: %v", err)
+		log.Printf("mDNS: Query error on %s: %v", ifaceName, err)
 	}
 	close(entriesCh)
 }
@@ -180,7 +252,14 @@ func getActiveInterface() (*net.Interface, error) {
 
 	// Prefer en0 (primary interface on macOS)
 	for _, iface := range interfaces {
-		if iface.Name == "en0" && iface.Flags&net.FlagUp != 0 {
+		if iface.Name == "en0" && iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagMulticast != 0 {
+			return &iface, nil
+		}
+	}
+
+	// Try en1 (secondary interface, common on some Macs)
+	for _, iface := range interfaces {
+		if iface.Name == "en1" && iface.Flags&net.FlagUp != 0 && iface.Flags&net.FlagMulticast != 0 {
 			return &iface, nil
 		}
 	}
@@ -195,6 +274,25 @@ func getActiveInterface() (*net.Interface, error) {
 	}
 
 	return nil, nil // Let the library choose
+}
+
+// getAllMulticastInterfaces returns all interfaces that support multicast
+func getAllMulticastInterfaces() []*net.Interface {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+
+	var result []*net.Interface
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp != 0 &&
+			iface.Flags&net.FlagMulticast != 0 &&
+			iface.Flags&net.FlagLoopback == 0 {
+			ifaceCopy := iface
+			result = append(result, &ifaceCopy)
+		}
+	}
+	return result
 }
 
 // handleServiceEntry processes a discovered service
