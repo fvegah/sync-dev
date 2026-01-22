@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-01-22
 **Current Phase:** 1 of 4 (Keychain Security)
-**Status:** Phase 1 Complete
+**Status:** Phase 1 Complete (Plans 01-01 and 01-02)
 
 ## Quick Context
 
@@ -18,7 +18,7 @@ SyncDev es una app de sincronizacion de archivos peer-to-peer para macOS constru
 
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
-| 1 | Keychain Security | Complete | 1/1 plans |
+| 1 | Keychain Security | Complete | 2/2 plans |
 | 2 | Menu Bar Integration | Not Started | 0/3 reqs |
 | 3 | Progress Display | Not Started | 0/4 reqs |
 | 4 | Native macOS UI | Not Started | 0/2 reqs |
@@ -31,6 +31,7 @@ Run `/gsd:plan-phase 2` to create detailed execution plan for Menu Bar Integrati
 
 ## Recent Activity
 
+- 2026-01-22: Completed 01-02-PLAN.md (Engine keychain integration)
 - 2026-01-22: Completed 01-01-PLAN.md (Keychain secrets manager with migration)
 - 2026-01-22: Phase 1 planned (01-01-PLAN.md)
 - 2026-01-22: Project initialized with /gsd:new-project
@@ -46,6 +47,7 @@ Run `/gsd:plan-phase 2` to create detailed execution plan for Menu Bar Integrati
 | Keychain library | go-keyring vs direct Security.framework | go-keyring | No CGo, cross-platform API, simpler |
 | UI framework | Keep Svelte 3 vs upgrade to Svelte 5 | Upgrade to Svelte 5 | Better performance, shadcn-svelte requires it |
 | Migration strategy | Manual vs automatic on startup | Automatic | Non-intrusive, transparent to user |
+| Secret loading | Inline vs helper method | Helper method | getSecretForPeer encapsulates error handling, cleaner code |
 
 ## Blockers
 
@@ -58,18 +60,21 @@ None currently.
 - `.planning/research/SUMMARY.md` - Research findings
 - `.planning/codebase/ARCHITECTURE.md` - Current system architecture
 - `.planning/codebase/CONCERNS.md` - Technical debt and known issues
-- `.planning/phases/01-keychain-security/01-01-SUMMARY.md` - Phase 1 completion summary
+- `.planning/phases/01-keychain-security/01-01-SUMMARY.md` - Plan 01-01 completion summary
+- `.planning/phases/01-keychain-security/01-02-SUMMARY.md` - Plan 01-02 completion summary
 
 ## New Artifacts (Phase 1)
 
 - `internal/secrets/keychain.go` - Manager interface and KeychainManager
 - `internal/secrets/keychain_test.go` - Keychain test suite
 - `internal/config/store_test.go` - Migration test suite
+- `internal/config/store.go` - GetSecrets() and migrateSecretsToKeychain()
+- `internal/sync/engine.go` - Updated to use keychain for all secret operations
 
 ## Session Continuity
 
 Last session: 2026-01-22
-Stopped at: Completed 01-01-PLAN.md
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
 
 ## Session Handoff Notes
