@@ -107,6 +107,15 @@ func NewEngine(cfg *config.Store) (*Engine, error) {
 	return engine, nil
 }
 
+// getSecretForPeer loads a peer's shared secret from keychain
+func (e *Engine) getSecretForPeer(peerID string) string {
+	secret, err := e.config.GetSecrets().GetSecret(peerID)
+	if err != nil && err != secrets.ErrSecretNotFound {
+		log.Printf("Warning: failed to load secret for peer %s: %v", peerID, err)
+	}
+	return secret
+}
+
 // Start starts the sync engine
 func (e *Engine) Start() error {
 	if err := e.server.Start(); err != nil {
@@ -446,12 +455,7 @@ func (e *Engine) getOrCreateConnection(peer *models.Peer) (*network.PeerConnecti
 
 	conn.PeerID = peer.ID
 	conn.PeerName = peer.Name
-	// Load shared secret from keychain
-	secret, err := e.config.GetSecrets().GetSecret(peer.ID)
-	if err != nil && err != secrets.ErrSecretNotFound {
-		log.Printf("Warning: failed to load secret for peer %s: %v", peer.ID, err)
-	}
-	conn.SharedSecret = secret
+	conn.SharedSecret = e.getSecretForPeer(peer.ID)
 	conn.Paired = peer.Paired
 
 	e.connections[peer.ID] = conn
@@ -523,12 +527,7 @@ func (e *Engine) OnConnect(conn *network.PeerConnection) {
 	// Check if peer is already paired
 	cfg := e.config.Get()
 	if peer := cfg.GetPeer(conn.PeerID); peer != nil && peer.Paired {
-		// Load shared secret from keychain
-		secret, err := e.config.GetSecrets().GetSecret(conn.PeerID)
-		if err != nil && err != secrets.ErrSecretNotFound {
-			log.Printf("Warning: failed to load secret for peer %s: %v", conn.PeerID, err)
-		}
-		conn.SharedSecret = secret
+		conn.SharedSecret = e.getSecretForPeer(conn.PeerID)
 		conn.Paired = true
 	}
 
