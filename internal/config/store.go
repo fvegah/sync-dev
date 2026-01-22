@@ -51,6 +51,25 @@ func NewStore() (*Store, error) {
 	return store, nil
 }
 
+// NewStoreWithPath creates a new configuration store with a custom config path
+// This is primarily used for testing
+func NewStoreWithPath(configPath string) (*Store, error) {
+	store := &Store{
+		configPath: configPath,
+		secrets:    secrets.NewKeychainManager(),
+	}
+
+	if err := store.load(); err != nil {
+		return nil, err
+	}
+
+	if err := store.migrateSecretsToKeychain(); err != nil {
+		log.Printf("Warning: secret migration failed: %v", err)
+	}
+
+	return store, nil
+}
+
 // load reads the configuration from disk
 func (s *Store) load() error {
 	s.mu.Lock()
