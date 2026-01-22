@@ -4,6 +4,7 @@ import (
 	"SyncDev/internal/config"
 	"SyncDev/internal/models"
 	"SyncDev/internal/network"
+	"SyncDev/internal/secrets"
 	"context"
 	"fmt"
 	"log"
@@ -59,6 +60,8 @@ type Engine struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	schedulerStop chan struct{}
+	schedulerMu   sync.Mutex
+	schedulerRunning bool
 
 	pairingCode   string
 	pairingCodeMu sync.RWMutex
@@ -117,6 +120,7 @@ func (e *Engine) Start() error {
 	// Start scheduler for periodic syncs
 	cfg := e.config.Get()
 	if cfg.AutoSync {
+		e.schedulerStop = make(chan struct{})
 		go e.startScheduler()
 	}
 
@@ -127,7 +131,14 @@ func (e *Engine) Start() error {
 // Stop stops the sync engine
 func (e *Engine) Stop() {
 	e.cancel()
-	close(e.schedulerStop)
+	e.schedulerMu.Lock()
+	if e.schedulerStop != nil && e.schedulerRunning {
+		select {
+		case e.schedulerStop <- struct{}{}:
+		default:
+		}
+	}
+	e.schedulerMu.Unlock()
 	e.server.Stop()
 	e.discovery.Stop()
 
@@ -193,7 +204,7 @@ func (e *Engine) GetDiscoveredPeers() []*models.Peer {
 		for _, cp := range cfg.Peers {
 			if dp.ID == cp.ID {
 				dp.Paired = cp.Paired
-				dp.SharedSecret = cp.SharedSecret
+				// Note: SharedSecret loaded from keychain when connection is established
 				break
 			}
 		}
@@ -230,21 +241,93 @@ func (e *Engine) addEvent(event *SyncEvent) {
 
 // startScheduler starts the periodic sync scheduler
 func (e *Engine) startScheduler() {
+	e.schedulerMu.Lock()
+	if e.schedulerRunning {
+		e.schedulerMu.Unlock()
+		return
+	}
+	e.schedulerRunning = true
+	e.schedulerMu.Unlock()
+
 	cfg := e.config.Get()
 	interval := time.Duration(cfg.SyncIntervalMins) * time.Minute
 	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
+	defer func() {
+		ticker.Stop()
+		e.schedulerMu.Lock()
+		e.schedulerRunning = false
+		e.schedulerMu.Unlock()
+	}()
+
+	log.Printf("Scheduler started with interval: %d minutes", cfg.SyncIntervalMins)
 
 	for {
 		select {
 		case <-e.schedulerStop:
+			log.Println("Scheduler stopped via stop channel")
 			return
 		case <-e.ctx.Done():
+			log.Println("Scheduler stopped via context cancellation")
 			return
 		case <-ticker.C:
-			e.SyncAllPairs()
+			cfg := e.config.Get()
+			if cfg.AutoSync {
+				e.SyncAllPairs()
+			}
 		}
 	}
+}
+
+// RestartScheduler restarts the scheduler with current config settings
+func (e *Engine) RestartScheduler() {
+	// Stop existing scheduler
+	e.schedulerMu.Lock()
+	wasRunning := e.schedulerRunning
+	e.schedulerMu.Unlock()
+
+	if wasRunning {
+		// Signal stop and wait a bit
+		select {
+		case e.schedulerStop <- struct{}{}:
+		default:
+		}
+		// Give it time to stop
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Recreate the stop channel
+	e.schedulerStop = make(chan struct{})
+
+	// Start new scheduler if auto-sync is enabled
+	cfg := e.config.Get()
+	if cfg.AutoSync {
+		go e.startScheduler()
+	}
+	log.Printf("Scheduler restarted: autoSync=%v, interval=%d min", cfg.AutoSync, cfg.SyncIntervalMins)
+}
+
+// UpdateAutoSync updates auto-sync setting and restarts scheduler
+func (e *Engine) UpdateAutoSync(enabled bool) {
+	if enabled {
+		e.schedulerMu.Lock()
+		running := e.schedulerRunning
+		e.schedulerMu.Unlock()
+		if !running {
+			e.schedulerStop = make(chan struct{})
+			go e.startScheduler()
+		}
+	} else {
+		e.schedulerMu.Lock()
+		running := e.schedulerRunning
+		e.schedulerMu.Unlock()
+		if running {
+			select {
+			case e.schedulerStop <- struct{}{}:
+			default:
+			}
+		}
+	}
+	log.Printf("Auto-sync updated: %v", enabled)
 }
 
 // SyncAllPairs syncs all folder pairs with all peers
@@ -363,7 +446,12 @@ func (e *Engine) getOrCreateConnection(peer *models.Peer) (*network.PeerConnecti
 
 	conn.PeerID = peer.ID
 	conn.PeerName = peer.Name
-	conn.SharedSecret = peer.SharedSecret
+	// Load shared secret from keychain
+	secret, err := e.config.GetSecrets().GetSecret(peer.ID)
+	if err != nil && err != secrets.ErrSecretNotFound {
+		log.Printf("Warning: failed to load secret for peer %s: %v", peer.ID, err)
+	}
+	conn.SharedSecret = secret
 	conn.Paired = peer.Paired
 
 	e.connections[peer.ID] = conn
@@ -435,7 +523,12 @@ func (e *Engine) OnConnect(conn *network.PeerConnection) {
 	// Check if peer is already paired
 	cfg := e.config.Get()
 	if peer := cfg.GetPeer(conn.PeerID); peer != nil && peer.Paired {
-		conn.SharedSecret = peer.SharedSecret
+		// Load shared secret from keychain
+		secret, err := e.config.GetSecrets().GetSecret(conn.PeerID)
+		if err != nil && err != secrets.ErrSecretNotFound {
+			log.Printf("Warning: failed to load secret for peer %s: %v", conn.PeerID, err)
+		}
+		conn.SharedSecret = secret
 		conn.Paired = true
 	}
 
@@ -459,7 +552,8 @@ func (e *Engine) handlePeerFound(peer *models.Peer) {
 	cfg := e.config.Get()
 	if existingPeer := cfg.GetPeer(peer.ID); existingPeer != nil {
 		peer.Paired = existingPeer.Paired
-		peer.SharedSecret = existingPeer.SharedSecret
+		// Don't copy SharedSecret from existingPeer - it's in keychain
+		// Secret will be loaded when connection is established
 	}
 
 	if e.onPeerChange != nil {
@@ -1065,4 +1159,101 @@ func (e *Engine) ClearPairingCode() {
 	e.pairingCodeMu.Lock()
 	e.pairingCode = ""
 	e.pairingCodeMu.Unlock()
+}
+
+// SyncPreview represents a preview of sync changes
+type SyncPreview struct {
+	FolderPairID string              `json:"folderPairId"`
+	PeerName     string              `json:"peerName"`
+	LocalPath    string              `json:"localPath"`
+	RemotePath   string              `json:"remotePath"`
+	ToPush       []*models.FileInfo  `json:"toPush"`
+	ToPull       []*models.FileInfo  `json:"toPull"`
+	ToDelete     []*models.FileInfo  `json:"toDelete"`
+	PushCount    int                 `json:"pushCount"`
+	PullCount    int                 `json:"pullCount"`
+	DeleteCount  int                 `json:"deleteCount"`
+	PushSize     int64               `json:"pushSize"`
+	PullSize     int64               `json:"pullSize"`
+	Error        string              `json:"error,omitempty"`
+}
+
+// AnalyzeFolderPair analyzes a folder pair and returns what would be synced
+func (e *Engine) AnalyzeFolderPair(folderPairID string) (*SyncPreview, error) {
+	cfg := e.config.Get()
+	fp := cfg.GetFolderPair(folderPairID)
+	if fp == nil {
+		return nil, fmt.Errorf("folder pair not found: %s", folderPairID)
+	}
+
+	peer := cfg.GetPeer(fp.PeerID)
+	if peer == nil {
+		return nil, fmt.Errorf("peer not found: %s", fp.PeerID)
+	}
+
+	preview := &SyncPreview{
+		FolderPairID: fp.ID,
+		PeerName:     peer.Name,
+		LocalPath:    fp.LocalPath,
+		RemotePath:   fp.RemotePath,
+		ToPush:       make([]*models.FileInfo, 0),
+		ToPull:       make([]*models.FileInfo, 0),
+		ToDelete:     make([]*models.FileInfo, 0),
+	}
+
+	// Check if peer is online
+	discoveredPeer := e.discovery.GetPeer(fp.PeerID)
+	if discoveredPeer == nil || discoveredPeer.Status != models.PeerStatusOnline {
+		preview.Error = "Peer is offline"
+		return preview, nil
+	}
+
+	// Scan local directory
+	localIndex, err := e.scanner.ScanDirectory(fp.LocalPath)
+	if err != nil {
+		preview.Error = fmt.Sprintf("Failed to scan local directory: %v", err)
+		return preview, nil
+	}
+
+	// Try to load last known remote index
+	remoteIndex, err := e.indexManager.LoadIndex(fp.ID + "_remote")
+	if err != nil {
+		// No previous remote index, everything is new
+		for _, f := range localIndex.Files {
+			if !f.IsDir {
+				preview.ToPush = append(preview.ToPush, f)
+				preview.PushSize += f.Size
+			}
+		}
+		preview.PushCount = len(preview.ToPush)
+		return preview, nil
+	}
+
+	// Compare indices
+	actions := CompareIndices(localIndex, remoteIndex)
+
+	for _, action := range actions {
+		switch action.Action {
+		case models.FileActionPush:
+			if action.LocalFile != nil && !action.LocalFile.IsDir {
+				preview.ToPush = append(preview.ToPush, action.LocalFile)
+				preview.PushSize += action.LocalFile.Size
+			}
+		case models.FileActionPull:
+			if action.RemoteFile != nil && !action.RemoteFile.IsDir {
+				preview.ToPull = append(preview.ToPull, action.RemoteFile)
+				preview.PullSize += action.RemoteFile.Size
+			}
+		case models.FileActionDelete:
+			if action.LocalFile != nil {
+				preview.ToDelete = append(preview.ToDelete, action.LocalFile)
+			}
+		}
+	}
+
+	preview.PushCount = len(preview.ToPush)
+	preview.PullCount = len(preview.ToPull)
+	preview.DeleteCount = len(preview.ToDelete)
+
+	return preview, nil
 }
