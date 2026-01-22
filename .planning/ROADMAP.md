@@ -35,8 +35,15 @@ Al completar este milestone:
 - Mantener backward compatibility con config.json para otros datos
 
 **Key Files:**
-- `internal/config/store.go` - Integrar keyring
-- `internal/config/keychain.go` - Nuevo: wrapper de Keychain
+- `internal/secrets/keychain.go` - Nuevo: wrapper de Keychain
+- `internal/config/store.go` - Integrar keyring + migration
+- `internal/sync/engine.go` - Usar keychain para secrets
+
+**Plans:** 2 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Create keychain manager, tests, and config integration with migration
+- [ ] 01-02-PLAN.md — Update sync engine to use keychain for all secret operations
 
 **Risks:**
 - Apps sin code signing muestran prompts de Keychain - documentar para desarrollo
@@ -176,7 +183,7 @@ Phase 2 (Menu Bar) ──┘
 - **PROG requirements:** 4/4 mapped (100%)
 - **UI requirements:** 2/2 mapped (100%)
 
-**Total:** 10/10 requirements mapped across 4 phases ✓
+**Total:** 10/10 requirements mapped across 4 phases
 
 ---
 
