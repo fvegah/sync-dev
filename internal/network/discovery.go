@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -83,6 +84,10 @@ func (d *Discovery) startAdvertising() error {
 		fmt.Sprintf("version=%s", config.AppVersion),
 	}
 
+	log.Printf("mDNS: Creating service with ID=%s, Name=%s, IP=%s, Port=%d",
+		d.deviceID, d.deviceName, localIP.String(), d.port)
+	log.Printf("mDNS: TXT records: %v", txtRecords)
+
 	// Create mDNS service
 	service, err := mdns.NewMDNSService(
 		d.deviceID,
@@ -97,14 +102,23 @@ func (d *Discovery) startAdvertising() error {
 		return fmt.Errorf("failed to create mDNS service: %w", err)
 	}
 
-	// Create and start server
-	server, err := mdns.NewServer(&mdns.Config{Zone: service})
+	// Get the active interface for multicast
+	iface, _ := getActiveInterface()
+
+	// Create and start server with interface binding
+	serverConfig := &mdns.Config{Zone: service}
+	if iface != nil {
+		serverConfig.Iface = iface
+		log.Printf("mDNS: Using interface %s for advertising", iface.Name)
+	}
+
+	server, err := mdns.NewServer(serverConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start mDNS server: %w", err)
 	}
 
 	d.server = server
-	log.Printf("mDNS: Advertising as %s on port %d", d.deviceName, d.port)
+	log.Printf("mDNS: Advertising as %s on port %d (IP: %s)", d.deviceName, d.port, localIP.String())
 	return nil
 }
 
@@ -136,12 +150,19 @@ func (d *Discovery) scan() {
 		}
 	}()
 
+	// Get the active network interface
+	iface, err := getActiveInterface()
+	if err != nil {
+		log.Printf("mDNS: Failed to get active interface: %v", err)
+	}
+
 	params := &mdns.QueryParam{
 		Service:             config.ServiceName,
 		Domain:              "local",
 		Timeout:             5 * time.Second,
 		Entries:             entriesCh,
-		WantUnicastResponse: true,
+		WantUnicastResponse: false, // Use multicast
+		Interface:           iface,
 	}
 
 	if err := mdns.Query(params); err != nil {
@@ -150,32 +171,96 @@ func (d *Discovery) scan() {
 	close(entriesCh)
 }
 
+// getActiveInterface returns the active network interface (en0 for WiFi/Ethernet)
+func getActiveInterface() (*net.Interface, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	// Prefer en0 (primary interface on macOS)
+	for _, iface := range interfaces {
+		if iface.Name == "en0" && iface.Flags&net.FlagUp != 0 {
+			return &iface, nil
+		}
+	}
+
+	// Fallback to any active interface with multicast support
+	for _, iface := range interfaces {
+		if iface.Flags&net.FlagUp != 0 &&
+			iface.Flags&net.FlagMulticast != 0 &&
+			iface.Flags&net.FlagLoopback == 0 {
+			return &iface, nil
+		}
+	}
+
+	return nil, nil // Let the library choose
+}
+
 // handleServiceEntry processes a discovered service
 func (d *Discovery) handleServiceEntry(entry *mdns.ServiceEntry) {
+	log.Printf("mDNS: Processing entry - Name: %s, Host: %s, Port: %d, AddrV4: %v, InfoFields: %v, Info: %s",
+		entry.Name, entry.Host, entry.Port, entry.AddrV4, entry.InfoFields, entry.Info)
+
 	// Parse TXT records
 	deviceID := ""
 	deviceName := ""
 	version := ""
 
+	// Try InfoFields first
 	for _, txt := range entry.InfoFields {
-		switch {
-		case len(txt) > 10 && txt[:10] == "device_id=":
-			deviceID = txt[10:]
-		case len(txt) > 12 && txt[:12] == "device_name=":
-			deviceName = txt[12:]
-		case len(txt) > 8 && txt[:8] == "version=":
-			version = txt[8:]
+		if strings.HasPrefix(txt, "device_id=") {
+			deviceID = strings.TrimPrefix(txt, "device_id=")
+		} else if strings.HasPrefix(txt, "device_name=") {
+			deviceName = strings.TrimPrefix(txt, "device_name=")
+		} else if strings.HasPrefix(txt, "version=") {
+			version = strings.TrimPrefix(txt, "version=")
 		}
 	}
 
+	// Fallback: parse Info field if InfoFields is empty
+	if deviceID == "" && entry.Info != "" {
+		for _, part := range strings.Split(entry.Info, ",") {
+			part = strings.TrimSpace(part)
+			if strings.HasPrefix(part, "device_id=") {
+				deviceID = strings.TrimPrefix(part, "device_id=")
+			} else if strings.HasPrefix(part, "device_name=") {
+				deviceName = strings.TrimPrefix(part, "device_name=")
+			} else if strings.HasPrefix(part, "version=") {
+				version = strings.TrimPrefix(part, "version=")
+			}
+		}
+	}
+
+	// If still no deviceID, try using the entry Name (which is the instance name)
+	if deviceID == "" && entry.Name != "" {
+		// The instance name might be the device ID
+		deviceID = entry.Name
+		if deviceName == "" {
+			deviceName = entry.Host
+		}
+	}
+
+	log.Printf("mDNS: Parsed - deviceID: %s, deviceName: %s, version: %s", deviceID, deviceName, version)
+
 	// Skip if this is our own device
 	if deviceID == d.deviceID {
+		log.Printf("mDNS: Skipping own device %s", deviceID)
 		return
 	}
 
 	// Skip if missing required info
-	if deviceID == "" || deviceName == "" {
+	if deviceID == "" {
+		log.Printf("mDNS: Skipping entry with no deviceID")
 		return
+	}
+
+	// Use hostname as device name if not provided
+	if deviceName == "" {
+		deviceName = entry.Host
+		if deviceName == "" {
+			deviceName = "Unknown Mac"
+		}
 	}
 
 	// Get IP address
