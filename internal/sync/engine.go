@@ -609,7 +609,12 @@ func (e *Engine) handlePairingRequest(conn *network.PeerConnection, msg *network
 	conn.PeerID = payload.DeviceID
 	conn.PeerName = payload.DeviceName
 
-	// Save to config
+	// Store secret in keychain
+	if err := e.config.GetSecrets().SetSecret(payload.DeviceID, secret); err != nil {
+		log.Printf("Error: failed to store secret for peer %s: %v", payload.DeviceID, err)
+	}
+
+	// Save to config (without secret - it's in keychain)
 	e.config.Update(func(c *config.Config) {
 		peer := c.GetPeer(payload.DeviceID)
 		if peer == nil {
@@ -619,7 +624,7 @@ func (e *Engine) handlePairingRequest(conn *network.PeerConnection, msg *network
 			}
 			c.AddPeer(peer)
 		}
-		peer.SharedSecret = secret
+		// Don't set peer.SharedSecret - it's stored in keychain
 		peer.Paired = true
 		peer.Host = conn.Conn.RemoteAddr().String()
 	})
@@ -655,7 +660,12 @@ func (e *Engine) handlePairingResponse(conn *network.PeerConnection, msg *networ
 		conn.SharedSecret = payload.SharedSecret
 		conn.Paired = true
 
-		// Save to config
+		// Store secret in keychain
+		if err := e.config.GetSecrets().SetSecret(conn.PeerID, payload.SharedSecret); err != nil {
+			log.Printf("Error: failed to store secret for peer %s: %v", conn.PeerID, err)
+		}
+
+		// Save to config (without secret - it's in keychain)
 		e.config.Update(func(c *config.Config) {
 			peer := c.GetPeer(conn.PeerID)
 			if peer == nil {
@@ -665,7 +675,7 @@ func (e *Engine) handlePairingResponse(conn *network.PeerConnection, msg *networ
 				}
 				c.AddPeer(peer)
 			}
-			peer.SharedSecret = payload.SharedSecret
+			// Don't set peer.SharedSecret - it's stored in keychain
 			peer.Paired = true
 		})
 
@@ -1081,7 +1091,12 @@ func (e *Engine) AcceptPairing(peerID string) error {
 		return err
 	}
 
-	// Save pairing
+	// Store secret in keychain
+	if err := e.config.GetSecrets().SetSecret(peerID, secret); err != nil {
+		log.Printf("Error: failed to store secret for peer %s: %v", peerID, err)
+	}
+
+	// Save pairing to config (without secret - it's in keychain)
 	e.config.Update(func(c *config.Config) {
 		peer := c.GetPeer(peerID)
 		if peer == nil {
@@ -1091,7 +1106,7 @@ func (e *Engine) AcceptPairing(peerID string) error {
 			}
 			c.AddPeer(peer)
 		}
-		peer.SharedSecret = secret
+		// Don't set peer.SharedSecret - it's stored in keychain
 		peer.Paired = true
 	})
 
@@ -1113,10 +1128,15 @@ func (e *Engine) RejectPairing(peerID string) error {
 
 // UnpairPeer removes pairing with a peer
 func (e *Engine) UnpairPeer(peerID string) error {
+	// Delete secret from keychain
+	if err := e.config.GetSecrets().DeleteSecret(peerID); err != nil {
+		log.Printf("Warning: failed to delete secret for peer %s: %v", peerID, err)
+	}
+
 	e.config.Update(func(c *config.Config) {
 		if peer := c.GetPeer(peerID); peer != nil {
 			peer.Paired = false
-			peer.SharedSecret = ""
+			// Don't clear peer.SharedSecret - it's already in keychain (or deleted)
 		}
 		// Remove folder pairs for this peer
 		for i := len(c.FolderPairs) - 1; i >= 0; i-- {
