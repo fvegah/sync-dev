@@ -282,14 +282,22 @@ func (e *Engine) SyncFolderPair(folderPairID string) error {
 		return fmt.Errorf("folder pair not found: %s", folderPairID)
 	}
 
+	// Get peer from config (for pairing info)
 	peer := cfg.GetPeer(fp.PeerID)
 	if peer == nil {
 		return fmt.Errorf("peer not found: %s", fp.PeerID)
 	}
 
-	if peer.Status != models.PeerStatusOnline {
+	// Check if peer is online via discovery (more up-to-date status)
+	discoveredPeer := e.discovery.GetPeer(fp.PeerID)
+	if discoveredPeer == nil || discoveredPeer.Status != models.PeerStatusOnline {
 		return fmt.Errorf("peer is offline: %s", peer.Name)
 	}
+
+	// Update peer info from discovery
+	peer.Host = discoveredPeer.Host
+	peer.Port = discoveredPeer.Port
+	peer.Status = discoveredPeer.Status
 
 	e.setStatus(StatusScanning, fmt.Sprintf("Scanning %s", fp.LocalPath))
 
@@ -413,6 +421,8 @@ func (e *Engine) HandleMessage(conn *network.PeerConnection, msg *network.Messag
 		e.handleDeleteFile(conn, msg)
 	case network.MsgTypePing:
 		e.client.SendPong(conn)
+	case network.MsgTypeFolderPairSync:
+		e.handleFolderPairSync(conn, msg)
 	default:
 		log.Printf("Unknown message type: %s", msg.Type)
 	}
@@ -871,6 +881,83 @@ func (e *Engine) handleDeleteFile(conn *network.PeerConnection, msg *network.Mes
 		PeerName:    conn.PeerName,
 		Description: "File deleted",
 	})
+}
+
+// handleFolderPairSync handles receiving a folder pair configuration from a peer
+func (e *Engine) handleFolderPairSync(conn *network.PeerConnection, msg *network.Message) {
+	var payload network.FolderPairSyncPayload
+	if err := msg.ParsePayload(&payload); err != nil {
+		log.Printf("Failed to parse folder pair sync: %v", err)
+		return
+	}
+
+	log.Printf("Received folder pair sync from %s: action=%s, local=%s, remote=%s",
+		conn.PeerName, payload.Action, payload.LocalPath, payload.RemotePath)
+
+	if payload.Action == "add" {
+		// Create the mirrored folder pair (swap local and remote paths)
+		e.config.Update(func(c *config.Config) {
+			// Check if we already have this folder pair
+			existing := c.GetFolderPair(payload.FolderPairID)
+			if existing != nil {
+				log.Printf("Folder pair %s already exists, skipping", payload.FolderPairID)
+				return
+			}
+
+			// Create mirrored folder pair - swap the paths!
+			fp := &models.FolderPair{
+				ID:         payload.FolderPairID,
+				PeerID:     conn.PeerID,
+				LocalPath:  payload.RemotePath, // Their remote is our local
+				RemotePath: payload.LocalPath,  // Their local is our remote
+				Enabled:    true,
+			}
+			c.AddFolderPair(fp)
+			log.Printf("Created mirrored folder pair: local=%s, remote=%s", fp.LocalPath, fp.RemotePath)
+		})
+	} else if payload.Action == "remove" {
+		e.config.Update(func(c *config.Config) {
+			c.RemoveFolderPair(payload.FolderPairID)
+			log.Printf("Removed folder pair %s", payload.FolderPairID)
+		})
+	}
+
+	// Notify UI about the change
+	if e.onPeerChange != nil {
+		e.onPeerChange()
+	}
+}
+
+// SendFolderPairSync sends a folder pair configuration to a peer
+func (e *Engine) SendFolderPairSync(peerID string, fp *models.FolderPair, action string) error {
+	peer := e.discovery.GetPeer(peerID)
+	if peer == nil {
+		// Try from config
+		cfg := e.config.Get()
+		peer = cfg.GetPeer(peerID)
+	}
+	if peer == nil {
+		return fmt.Errorf("peer not found: %s", peerID)
+	}
+
+	conn, err := e.getOrCreateConnection(peer)
+	if err != nil {
+		return fmt.Errorf("failed to connect to peer: %w", err)
+	}
+
+	payload := &network.FolderPairSyncPayload{
+		FolderPairID: fp.ID,
+		LocalPath:    fp.LocalPath,
+		RemotePath:   fp.RemotePath,
+		Action:       action,
+	}
+
+	msg, err := network.NewMessage(network.MsgTypeFolderPairSync, payload)
+	if err != nil {
+		return err
+	}
+
+	return conn.WriteMessage(msg)
 }
 
 // RequestPairing initiates pairing with a peer

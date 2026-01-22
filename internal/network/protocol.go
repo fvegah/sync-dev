@@ -34,6 +34,9 @@ const (
 	MsgTypePing          MessageType = "ping"
 	MsgTypePong          MessageType = "pong"
 	MsgTypeError         MessageType = "error"
+
+	// Config sync messages
+	MsgTypeFolderPairSync MessageType = "folder_pair_sync"
 )
 
 const (
@@ -135,6 +138,14 @@ type DeleteFilePayload struct {
 type ErrorPayload struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+}
+
+// FolderPairSyncPayload shares a folder pair configuration with the peer
+type FolderPairSyncPayload struct {
+	FolderPairID string `json:"folderPairId"`
+	LocalPath    string `json:"localPath"`  // Path on the sender's machine
+	RemotePath   string `json:"remotePath"` // Path on the receiver's machine
+	Action       string `json:"action"`     // "add" or "remove"
 }
 
 // NewMessage creates a new protocol message

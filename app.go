@@ -224,6 +224,17 @@ func (a *App) AddFolderPair(peerID, localPath, remotePath string) (*models.Folde
 		return nil, err
 	}
 
+	// Send folder pair configuration to the peer
+	if a.syncEngine != nil {
+		go func() {
+			if err := a.syncEngine.SendFolderPairSync(peerID, pair, "add"); err != nil {
+				log.Printf("Failed to sync folder pair to peer: %v", err)
+			} else {
+				log.Printf("Folder pair synced to peer %s", peerID)
+			}
+		}()
+	}
+
 	return pair, nil
 }
 
