@@ -2,7 +2,7 @@
 
 **Milestone:** v1.1 - UX Improvements
 **Created:** 2026-01-22
-**Status:** Planning
+**Status:** In Progress (Phase 1 Complete)
 
 ## Milestone Goal
 
@@ -23,11 +23,12 @@ Al completar este milestone:
 
 ## Phases
 
-### Phase 1: Keychain Security
+### Phase 1: Keychain Security ✓
+**Status:** Complete (2026-01-22)
 **Goal:** Migrar almacenamiento de secrets de texto plano a macOS Keychain
 
 **Requirements:**
-- [ ] SEC-01: Almacenar shared secrets en macOS Keychain
+- [x] SEC-01: Almacenar shared secrets en macOS Keychain
 
 **Approach:**
 - Usar zalando/go-keyring para acceso a Keychain sin CGo
@@ -35,23 +36,20 @@ Al completar este milestone:
 - Mantener backward compatibility con config.json para otros datos
 
 **Key Files:**
-- `internal/secrets/keychain.go` - Nuevo: wrapper de Keychain
-- `internal/config/store.go` - Integrar keyring + migration
-- `internal/sync/engine.go` - Usar keychain para secrets
+- `internal/secrets/keychain.go` - Manager interface y KeychainManager
+- `internal/config/store.go` - Migration y GetSecrets()
+- `internal/sync/engine.go` - getSecretForPeer() helper
 
-**Plans:** 2 plans
+**Plans:** 2/2 complete
 
 Plans:
-- [ ] 01-01-PLAN.md — Create keychain manager, tests, and config integration with migration
-- [ ] 01-02-PLAN.md — Update sync engine to use keychain for all secret operations
-
-**Risks:**
-- Apps sin code signing muestran prompts de Keychain - documentar para desarrollo
+- [x] 01-01-PLAN.md — Keychain manager, tests, and config integration with migration
+- [x] 01-02-PLAN.md — Engine integration with keychain for all secret operations
 
 **Success Criteria:**
-- [ ] Secrets se guardan en Keychain, no en config.json
-- [ ] Migración automática de secrets existentes
-- [ ] App funciona sin prompts molestos de Keychain
+- [x] Secrets se guardan en Keychain, no en config.json
+- [x] Migración automática de secrets existentes
+- [x] App funciona sin prompts molestos de Keychain (go-keyring usa /usr/bin/security)
 
 ---
 
