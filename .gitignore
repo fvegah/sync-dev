@@ -1,6 +1,10 @@
 # Build output
 build/bin
+build/windows
 *.dmg
+
+# Cache
+*.md5
 
 # Frontend
 node_modules
