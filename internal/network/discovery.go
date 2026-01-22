@@ -197,21 +197,15 @@ func (d *Discovery) scan() {
 	// Get all multicast interfaces
 	interfaces := getAllMulticastInterfaces()
 	if len(interfaces) == 0 {
-		log.Printf("mDNS: No multicast interfaces found, trying without interface binding")
+		log.Printf("mDNS: No physical multicast interfaces found, trying default")
 		d.scanOnInterface(nil)
 		return
 	}
 
-	log.Printf("mDNS: Scanning on %d interfaces", len(interfaces))
-
-	// Scan on each interface
+	// Scan on each physical interface
 	for _, iface := range interfaces {
-		log.Printf("mDNS: Scanning on interface %s", iface.Name)
 		d.scanOnInterface(iface)
 	}
-
-	// Also try without interface binding as fallback
-	d.scanOnInterface(nil)
 }
 
 // scanOnInterface performs a scan on a specific interface
@@ -223,11 +217,6 @@ func (d *Discovery) scanOnInterface(iface *net.Interface) {
 		}
 	}()
 
-	ifaceName := "default"
-	if iface != nil {
-		ifaceName = iface.Name
-	}
-
 	params := &mdns.QueryParam{
 		Service:             config.ServiceName,
 		Domain:              "local",
@@ -237,9 +226,8 @@ func (d *Discovery) scanOnInterface(iface *net.Interface) {
 		Interface:           iface,
 	}
 
-	if err := mdns.Query(params); err != nil {
-		log.Printf("mDNS: Query error on %s: %v", ifaceName, err)
-	}
+	// Silently ignore errors - they're common for interfaces that don't support multicast
+	mdns.Query(params)
 	close(entriesCh)
 }
 
@@ -276,7 +264,7 @@ func getActiveInterface() (*net.Interface, error) {
 	return nil, nil // Let the library choose
 }
 
-// getAllMulticastInterfaces returns all interfaces that support multicast
+// getAllMulticastInterfaces returns physical interfaces that support multicast
 func getAllMulticastInterfaces() []*net.Interface {
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -285,6 +273,11 @@ func getAllMulticastInterfaces() []*net.Interface {
 
 	var result []*net.Interface
 	for _, iface := range interfaces {
+		// Skip non-physical interfaces (VPNs, tunnels, bridges, etc.)
+		if !isPhysicalInterface(iface.Name) {
+			continue
+		}
+
 		if iface.Flags&net.FlagUp != 0 &&
 			iface.Flags&net.FlagMulticast != 0 &&
 			iface.Flags&net.FlagLoopback == 0 {
@@ -293,6 +286,16 @@ func getAllMulticastInterfaces() []*net.Interface {
 		}
 	}
 	return result
+}
+
+// isPhysicalInterface returns true for physical network interfaces (WiFi, Ethernet)
+func isPhysicalInterface(name string) bool {
+	// On macOS, physical interfaces are typically en0, en1, en2, etc.
+	// Skip virtual interfaces: utun (VPN), bridge, awdl (AirDrop), llw, ap
+	if strings.HasPrefix(name, "en") {
+		return true
+	}
+	return false
 }
 
 // handleServiceEntry processes a discovered service

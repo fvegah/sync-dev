@@ -59,6 +59,9 @@ type Engine struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	schedulerStop chan struct{}
+
+	pairingCode   string
+	pairingCodeMu sync.RWMutex
 }
 
 // NewEngine creates a new sync engine
@@ -469,9 +472,71 @@ func (e *Engine) handlePairingRequest(conn *network.PeerConnection, msg *network
 		return
 	}
 
-	// Pairing requests are handled by the UI through events
-	// The UI will call AcceptPairing or RejectPairing
 	log.Printf("Received pairing request from %s with code %s", payload.DeviceName, payload.Code)
+
+	// Verify the pairing code
+	currentCode := e.GetPairingCode()
+	if currentCode == "" {
+		log.Printf("No pairing code generated, rejecting request")
+		e.client.SendPairingResponse(conn, false, "", "No pairing code active on this device")
+		return
+	}
+
+	if payload.Code != currentCode {
+		log.Printf("Pairing code mismatch: expected %s, got %s", currentCode, payload.Code)
+		e.client.SendPairingResponse(conn, false, "", "Invalid pairing code")
+		return
+	}
+
+	// Code matches - accept pairing
+	log.Printf("Pairing code verified, accepting pairing from %s", payload.DeviceName)
+
+	// Generate shared secret
+	secret, err := network.GenerateSharedSecret()
+	if err != nil {
+		log.Printf("Failed to generate shared secret: %v", err)
+		e.client.SendPairingResponse(conn, false, "", "Internal error")
+		return
+	}
+
+	// Update connection
+	conn.SharedSecret = secret
+	conn.Paired = true
+	conn.PeerID = payload.DeviceID
+	conn.PeerName = payload.DeviceName
+
+	// Save to config
+	e.config.Update(func(c *config.Config) {
+		peer := c.GetPeer(payload.DeviceID)
+		if peer == nil {
+			peer = &models.Peer{
+				ID:   payload.DeviceID,
+				Name: payload.DeviceName,
+			}
+			c.AddPeer(peer)
+		}
+		peer.SharedSecret = secret
+		peer.Paired = true
+		peer.Host = conn.Conn.RemoteAddr().String()
+	})
+
+	// Store connection
+	e.mu.Lock()
+	e.connections[payload.DeviceID] = conn
+	e.mu.Unlock()
+
+	// Send acceptance response with shared secret
+	e.client.SendPairingResponse(conn, true, secret, "")
+
+	// Clear the pairing code after successful pairing
+	e.ClearPairingCode()
+
+	// Notify UI
+	if e.onPeerChange != nil {
+		e.onPeerChange()
+	}
+
+	log.Printf("Pairing completed with %s", payload.DeviceName)
 }
 
 // handlePairingResponse handles a pairing response
@@ -891,7 +956,26 @@ func (e *Engine) UnpairPeer(peerID string) error {
 	return nil
 }
 
-// GeneratePairingCode generates a new pairing code
+// GeneratePairingCode generates a new pairing code and stores it
 func (e *Engine) GeneratePairingCode() string {
-	return network.GeneratePairingCode()
+	code := network.GeneratePairingCode()
+	e.pairingCodeMu.Lock()
+	e.pairingCode = code
+	e.pairingCodeMu.Unlock()
+	log.Printf("Generated pairing code: %s", code)
+	return code
+}
+
+// GetPairingCode returns the current pairing code
+func (e *Engine) GetPairingCode() string {
+	e.pairingCodeMu.RLock()
+	defer e.pairingCodeMu.RUnlock()
+	return e.pairingCode
+}
+
+// ClearPairingCode clears the current pairing code
+func (e *Engine) ClearPairingCode() {
+	e.pairingCodeMu.Lock()
+	e.pairingCode = ""
+	e.pairingCodeMu.Unlock()
 }
