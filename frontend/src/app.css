@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+
+/* macOS system font and base styles */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Dark mode base colors */
+  @apply bg-slate-900 text-slate-100;
+}
+
+/* Light mode overrides */
+@media (prefers-color-scheme: light) {
+  body {
+    @apply bg-white text-slate-900;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  width: 100%;
+  height: 100%;
+}
+
+/* Utility for macOS-style vibrancy */
+.macos-vibrancy {
+  @apply backdrop-blur-md backdrop-saturate-150;
+}
+
+/* Scrollbar styling for macOS */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
