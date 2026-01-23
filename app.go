@@ -59,6 +59,20 @@ func (a *App) startup(app *application.App, window *application.WebviewWindow, t
 			"status": status,
 			"action": action,
 		})
+
+		// Update tray icon based on status
+		if a.tray != nil {
+			switch status {
+			case sync.StatusIdle:
+				a.tray.SetState(tray.StateIdle)
+			case sync.StatusSyncing, sync.StatusScanning:
+				a.tray.SetState(tray.StateSyncing)
+			case sync.StatusError:
+				a.tray.SetState(tray.StateError)
+			default:
+				a.tray.SetState(tray.StateIdle)
+			}
+		}
 	})
 
 	engine.SetProgressCallback(func(progress *models.TransferProgress) {
