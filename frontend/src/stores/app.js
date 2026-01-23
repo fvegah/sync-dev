@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 
 // Current tab
 export const currentTab = writable('peers');
@@ -15,8 +15,61 @@ export const syncStatus = writable({
     action: ''
 });
 
-// Transfer progress
-export const transferProgress = writable(null);
+// Raw progress data from backend (AggregateProgress shape)
+export const progressData = writable(null);
+
+// Keep transferProgress as alias for backward compatibility
+export const transferProgress = progressData;
+
+// Derived: formatted speed string
+export const formattedSpeed = derived(progressData, $p => {
+    if (!$p || !$p.bytesPerSecond || $p.bytesPerSecond <= 0) return '';
+    const speed = $p.bytesPerSecond;
+    if (speed >= 1024 * 1024) {
+        return `${(speed / (1024 * 1024)).toFixed(1)} MB/s`;
+    } else if (speed >= 1024) {
+        return `${(speed / 1024).toFixed(1)} KB/s`;
+    }
+    return `${Math.round(speed)} B/s`;
+});
+
+// Derived: formatted ETA string
+export const formattedETA = derived(progressData, $p => {
+    if (!$p || !$p.eta || $p.eta < 0) return '';
+    const eta = $p.eta;
+    if (eta < 60) {
+        return `${eta}s remaining`;
+    } else if (eta < 3600) {
+        const mins = Math.floor(eta / 60);
+        const secs = eta % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')} remaining`;
+    } else {
+        const hours = Math.floor(eta / 3600);
+        const mins = Math.floor((eta % 3600) / 60);
+        return `${hours}h ${mins}m remaining`;
+    }
+});
+
+// Derived: file count string
+export const fileCountProgress = derived(progressData, $p => {
+    if (!$p || !$p.totalFiles) return '';
+    return `${$p.completedFiles} of ${$p.totalFiles} files`;
+});
+
+// Derived: is syncing
+export const isSyncing = derived(progressData, $p => {
+    return $p?.status === 'syncing';
+});
+
+// Derived: overall percentage
+export const overallPercentage = derived(progressData, $p => {
+    return $p?.percentage ?? 0;
+});
+
+// Derived: active files list (for file progress list)
+export const activeFiles = derived(progressData, $p => {
+    return $p?.activeFiles ?? [];
+});
 
 // Recent sync events
 export const recentEvents = writable([]);
