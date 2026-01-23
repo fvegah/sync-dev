@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import { ExternalLink } from 'lucide-svelte';
     import { config } from '../stores/app.js';
     import {
         GetConfig,
@@ -12,14 +13,14 @@
         OpenDataDirectory
     } from '../../wailsjs/go/main/App.js';
 
-    let deviceName = '';
-    let syncInterval = 5;
-    let autoSync = true;
-    let exclusionsText = '';
-    let appVersion = '';
-    let dataDir = '';
-    let saved = false;
-    let saving = false;
+    let deviceName = $state('');
+    let syncInterval = $state(5);
+    let autoSync = $state(true);
+    let exclusionsText = $state('');
+    let appVersion = $state('');
+    let dataDir = $state('');
+    let saved = $state(false);
+    let saving = $state(false);
 
     onMount(async () => {
         const [cfg, version, dir] = await Promise.all([
@@ -63,10 +64,15 @@
     }
 </script>
 
-<div class="settings">
-    <div class="header">
-        <h2>Settings</h2>
-        <button class="btn-primary" on:click={saveSettings} disabled={saving}>
+<div class="h-full flex flex-col p-5">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">Settings</h2>
+        <button
+            class="px-4 py-2 text-sm font-medium text-white bg-macos-blue rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 min-w-[120px]"
+            onclick={saveSettings}
+            disabled={saving}
+        >
             {#if saving}
                 Saving...
             {:else if saved}
@@ -77,40 +83,60 @@
         </button>
     </div>
 
-    <div class="settings-content">
-        <div class="settings-section">
-            <h3>Device</h3>
-            <div class="form-group">
-                <label>Device Name</label>
-                <input type="text" bind:value={deviceName} placeholder="My Mac" />
-                <p class="hint">This name will be shown to other devices on your network.</p>
+    <!-- Settings content -->
+    <div class="flex-1 overflow-y-auto space-y-4">
+        <!-- Device section -->
+        <section class="bg-white/5 border border-white/10 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Device</h3>
+            <div>
+                <label class="block text-sm font-medium text-slate-200 mb-2">Device Name</label>
+                <input
+                    type="text"
+                    bind:value={deviceName}
+                    placeholder="My Mac"
+                    class="w-full px-3 py-2.5 bg-black/30 border border-white/10 rounded-lg text-slate-100 text-sm focus:outline-none focus:border-macos-blue"
+                />
+                <p class="text-xs text-slate-500 mt-2">This name will be shown to other devices on your network.</p>
             </div>
-        </div>
+        </section>
 
-        <div class="settings-section">
-            <h3>Synchronization</h3>
-            <div class="form-group">
-                <label>Sync Interval</label>
-                <div class="interval-input">
-                    <input type="range" min="1" max="60" bind:value={syncInterval} />
-                    <span class="interval-value">{syncInterval} min</span>
+        <!-- Synchronization section -->
+        <section class="bg-white/5 border border-white/10 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Synchronization</h3>
+
+            <div class="mb-5">
+                <label class="block text-sm font-medium text-slate-200 mb-2">Sync Interval</label>
+                <div class="flex items-center gap-4">
+                    <input
+                        type="range"
+                        min="1"
+                        max="60"
+                        bind:value={syncInterval}
+                        class="flex-1 h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-macos-blue [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+                    />
+                    <span class="min-w-[4rem] text-right font-medium text-macos-blue">{syncInterval} min</span>
                 </div>
-                <p class="hint">How often to automatically check for changes.</p>
+                <p class="text-xs text-slate-500 mt-2">How often to automatically check for changes.</p>
             </div>
 
-            <div class="form-group">
-                <label class="toggle-label">
-                    <input type="checkbox" bind:checked={autoSync} />
-                    <span>Enable automatic sync</span>
+            <div>
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        bind:checked={autoSync}
+                        class="w-5 h-5 rounded border-white/20 bg-black/30 text-macos-blue focus:ring-macos-blue cursor-pointer"
+                    />
+                    <span class="text-sm font-medium text-slate-200">Enable automatic sync</span>
                 </label>
-                <p class="hint">When disabled, you'll need to manually trigger syncs.</p>
+                <p class="text-xs text-slate-500 mt-2 ml-8">When disabled, you'll need to manually trigger syncs.</p>
             </div>
-        </div>
+        </section>
 
-        <div class="settings-section">
-            <h3>Exclusions</h3>
-            <div class="form-group">
-                <label>Global Exclusion Patterns</label>
+        <!-- Exclusions section -->
+        <section class="bg-white/5 border border-white/10 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Exclusions</h3>
+            <div>
+                <label class="block text-sm font-medium text-slate-200 mb-2">Global Exclusion Patterns</label>
                 <textarea
                     bind:value={exclusionsText}
                     placeholder=".DS_Store
@@ -118,244 +144,37 @@
 node_modules
 *.tmp"
                     rows="8"
+                    class="w-full px-3 py-2.5 bg-black/30 border border-white/10 rounded-lg text-slate-100 text-sm font-mono resize-y focus:outline-none focus:border-macos-blue"
                 ></textarea>
-                <p class="hint">
-                    Files and folders matching these patterns will be ignored during sync.
-                    Use glob patterns, one per line.
+                <p class="text-xs text-slate-500 mt-2">
+                    Files and folders matching these patterns will be ignored during sync. Use glob patterns, one per line.
                 </p>
             </div>
-        </div>
+        </section>
 
-        <div class="settings-section">
-            <h3>About</h3>
-            <div class="about-info">
-                <div class="info-row">
-                    <span class="info-label">Version</span>
-                    <span class="info-value">{appVersion}</span>
+        <!-- About section -->
+        <section class="bg-white/5 border border-white/10 rounded-xl p-5">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">About</h3>
+            <div class="space-y-3">
+                <div class="flex justify-between items-center py-2 border-b border-white/5">
+                    <span class="text-sm text-slate-400">Version</span>
+                    <span class="text-sm text-slate-100">{appVersion}</span>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Data Directory</span>
-                    <span class="info-value clickable" on:click={openDataDir}>
+                <div class="flex justify-between items-center py-2 border-b border-white/5">
+                    <span class="text-sm text-slate-400">Data Directory</span>
+                    <button
+                        class="flex items-center gap-2 text-sm text-macos-blue hover:text-blue-400 transition-colors"
+                        onclick={openDataDir}
+                    >
                         {dataDir}
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
-                            <polyline points="15 3 21 3 21 9"/>
-                            <line x1="10" y1="14" x2="21" y2="3"/>
-                        </svg>
-                    </span>
+                        <ExternalLink size={14} />
+                    </button>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Device ID</span>
-                    <span class="info-value device-id">{$config.deviceId}</span>
+                <div class="flex justify-between items-center py-2">
+                    <span class="text-sm text-slate-400">Device ID</span>
+                    <span class="text-xs text-slate-500 font-mono truncate max-w-[200px]">{$config.deviceId}</span>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </div>
-
-<style>
-    .settings {
-        padding: 20px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-
-    h2 {
-        margin: 0;
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-
-    h3 {
-        margin: 0 0 16px 0;
-        font-size: 1rem;
-        font-weight: 600;
-        color: #94a3b8;
-    }
-
-    .btn-primary {
-        background: #3b82f6;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.875rem;
-        font-weight: 500;
-        transition: all 0.2s;
-        min-width: 120px;
-    }
-
-    .btn-primary:hover:not(:disabled) {
-        background: #2563eb;
-    }
-
-    .btn-primary:disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-
-    .settings-content {
-        flex: 1;
-        overflow-y: auto;
-    }
-
-    .settings-section {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 16px;
-    }
-
-    .form-group {
-        margin-bottom: 20px;
-    }
-
-    .form-group:last-child {
-        margin-bottom: 0;
-    }
-
-    .form-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 0.875rem;
-        color: #f1f5f9;
-        font-weight: 500;
-    }
-
-    .form-group input[type="text"],
-    .form-group textarea {
-        width: 100%;
-        padding: 10px 12px;
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 6px;
-        color: #f1f5f9;
-        font-size: 0.875rem;
-        font-family: inherit;
-        resize: vertical;
-    }
-
-    .form-group input:focus,
-    .form-group textarea:focus {
-        outline: none;
-        border-color: #3b82f6;
-    }
-
-    .hint {
-        margin: 8px 0 0 0;
-        font-size: 0.75rem;
-        color: #64748b;
-    }
-
-    .interval-input {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-
-    .interval-input input[type="range"] {
-        flex: 1;
-        height: 6px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-        appearance: none;
-        cursor: pointer;
-    }
-
-    .interval-input input[type="range"]::-webkit-slider-thumb {
-        appearance: none;
-        width: 18px;
-        height: 18px;
-        background: #3b82f6;
-        border-radius: 50%;
-        cursor: pointer;
-    }
-
-    .interval-value {
-        min-width: 60px;
-        text-align: right;
-        font-weight: 500;
-        color: #60a5fa;
-    }
-
-    .toggle-label {
-        display: flex !important;
-        align-items: center;
-        gap: 12px;
-        cursor: pointer;
-    }
-
-    .toggle-label input[type="checkbox"] {
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-    }
-
-    .toggle-label span {
-        font-weight: normal;
-    }
-
-    .about-info {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .info-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 8px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .info-row:last-child {
-        border-bottom: none;
-    }
-
-    .info-label {
-        color: #64748b;
-        font-size: 0.875rem;
-    }
-
-    .info-value {
-        color: #f1f5f9;
-        font-size: 0.875rem;
-    }
-
-    .info-value.clickable {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        color: #60a5fa;
-        cursor: pointer;
-        transition: color 0.2s;
-    }
-
-    .info-value.clickable:hover {
-        color: #93c5fd;
-    }
-
-    .info-value.clickable svg {
-        width: 14px;
-        height: 14px;
-    }
-
-    .info-value.device-id {
-        font-family: monospace;
-        font-size: 0.75rem;
-        color: #64748b;
-        max-width: 200px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-</style>
