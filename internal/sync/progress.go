@@ -43,10 +43,6 @@ type ProgressAggregator struct {
 	// Throttling
 	lastEmitTime time.Time
 	emitCallback func(*models.AggregateProgress)
-
-	// Pending emission flag
-	pendingEmit bool
-	emitTimer   *time.Timer
 }
 
 // fileState tracks progress for a single file
@@ -82,7 +78,6 @@ func (p *ProgressAggregator) StartSync(totalFiles int, totalBytes int64) {
 	p.completedBytes = 0
 	p.smoothedSpeed = 0
 	p.lastBytesUpdate = 0
-	p.pendingEmit = false
 
 	p.emit()
 }
@@ -154,13 +149,6 @@ func (p *ProgressAggregator) EndSync() {
 	defer p.mu.Unlock()
 
 	p.status = "complete"
-
-	// Cancel any pending emit timer
-	if p.emitTimer != nil {
-		p.emitTimer.Stop()
-		p.emitTimer = nil
-	}
-
 	p.emit()
 }
 
@@ -177,12 +165,6 @@ func (p *ProgressAggregator) Reset() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	// Cancel any pending emit timer
-	if p.emitTimer != nil {
-		p.emitTimer.Stop()
-		p.emitTimer = nil
-	}
-
 	p.status = "idle"
 	p.totalFiles = 0
 	p.totalBytes = 0
@@ -191,7 +173,6 @@ func (p *ProgressAggregator) Reset() {
 	p.completedBytes = 0
 	p.smoothedSpeed = 0
 	p.lastBytesUpdate = 0
-	p.pendingEmit = false
 }
 
 // updateSpeed applies exponential smoothing to speed calculation
@@ -214,30 +195,16 @@ func (p *ProgressAggregator) updateSpeed(bytesDelta int64) {
 	p.lastUpdateTime = now
 }
 
-// scheduleEmit schedules a throttled emit
+// scheduleEmit emits if enough time has passed since last emit (simple throttling)
 func (p *ProgressAggregator) scheduleEmit() {
 	now := time.Now()
 	timeSinceLastEmit := now.Sub(p.lastEmitTime)
 
-	// If enough time has passed, emit immediately
+	// Only emit if enough time has passed (simple time-check throttling)
 	if timeSinceLastEmit >= emitInterval {
 		p.emit()
-		return
 	}
-
-	// Otherwise, schedule a delayed emit if not already pending
-	if !p.pendingEmit {
-		p.pendingEmit = true
-		delay := emitInterval - timeSinceLastEmit
-
-		p.emitTimer = time.AfterFunc(delay, func() {
-			p.mu.Lock()
-			defer p.mu.Unlock()
-
-			p.pendingEmit = false
-			p.emit()
-		})
-	}
+	// If not enough time passed, skip this update (next one will catch up)
 }
 
 // emit sends the current progress to the callback (must hold lock)
