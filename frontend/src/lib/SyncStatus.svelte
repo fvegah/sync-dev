@@ -156,6 +156,12 @@
         return `${size.toFixed(1)} ${units[unitIndex]}`;
     }
 
+    function getFileName(path) {
+        if (!path) return '';
+        const parts = path.split('/');
+        return parts[parts.length - 1] || path;
+    }
+
     async function analyzeAllPairs() {
         if ($folderPairs.length === 0) {
             alert('No folder pairs configured');
@@ -289,14 +295,31 @@
                     <div class="progress-fill" style="width: {$overallPercentage}%"></div>
                 </div>
 
-                <!-- Active file (show first active file if any) -->
+                <!-- Active files list -->
                 {#if $activeFiles.length > 0}
-                    <div class="active-file">
-                        <span class="active-file-name">{$activeFiles[0].path}</span>
-                        <span class="file-progress">{Math.round($activeFiles[0].percentage)}%</span>
-                    </div>
-                    <div class="progress-bar file">
-                        <div class="progress-fill" style="width: {$activeFiles[0].percentage}%"></div>
+                    <div class="active-files-section">
+                        <div class="active-files-header">
+                            <span class="active-files-title">Active Transfers</span>
+                            <span class="active-files-count">{$activeFiles.length}</span>
+                        </div>
+                        <div class="active-files-list">
+                            {#each $activeFiles.slice(0, 10) as file}
+                                <div class="active-file-item">
+                                    <div class="active-file-info">
+                                        <span class="active-file-name" title={file.path}>{getFileName(file.path)}</span>
+                                        <span class="active-file-bytes">
+                                            {formatBytesSync(file.bytesTransferred)} / {formatBytesSync(file.totalBytes)}
+                                        </span>
+                                    </div>
+                                    <div class="active-file-progress-row">
+                                        <div class="progress-bar file">
+                                            <div class="progress-fill" style="width: {file.percentage}%"></div>
+                                        </div>
+                                        <span class="file-percentage">{Math.round(file.percentage)}%</span>
+                                    </div>
+                                </div>
+                            {/each}
+                        </div>
                     </div>
                 {/if}
             </div>
@@ -608,14 +631,6 @@
         font-size: 0.875rem;
     }
 
-    .file-name {
-        color: #94a3b8;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 70%;
-    }
-
     .progress-stats {
         color: #60a5fa;
         font-weight: 500;
@@ -690,25 +705,106 @@
         height: 4px;
     }
 
-    .active-file {
+    .active-files-section {
+        margin-top: 12px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        padding-top: 12px;
+    }
+
+    .active-files-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 4px;
-        font-size: 0.8rem;
+        margin-bottom: 8px;
+    }
+
+    .active-files-title {
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #94a3b8;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .active-files-count {
+        font-size: 0.7rem;
+        background: rgba(59, 130, 246, 0.2);
+        color: #60a5fa;
+        padding: 2px 6px;
+        border-radius: 4px;
+    }
+
+    .active-files-list {
+        max-height: 200px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    /* Custom scrollbar styling */
+    .active-files-list::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .active-files-list::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 3px;
+    }
+
+    .active-files-list::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+    }
+
+    .active-files-list::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .active-file-item {
+        background: rgba(0, 0, 0, 0.15);
+        border-radius: 6px;
+        padding: 8px 10px;
+    }
+
+    .active-file-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 6px;
     }
 
     .active-file-name {
-        color: #94a3b8;
+        color: #e2e8f0;
+        font-size: 0.8rem;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        max-width: 70%;
+        max-width: 60%;
     }
 
-    .file-progress {
+    .active-file-bytes {
+        font-size: 0.7rem;
+        color: #64748b;
+        font-family: monospace;
+    }
+
+    .active-file-progress-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .active-file-progress-row .progress-bar {
+        flex: 1;
+    }
+
+    .file-percentage {
+        font-size: 0.7rem;
         color: #60a5fa;
         font-weight: 500;
+        min-width: 32px;
+        text-align: right;
     }
 
     .stats-row {
