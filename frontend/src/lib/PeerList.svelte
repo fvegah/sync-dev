@@ -1,20 +1,50 @@
 <script>
     import { onMount, onDestroy } from 'svelte';
+    import { Monitor, RefreshCw, X, Search } from 'lucide-svelte';
     import { peers, pairingState, showModal } from '../stores/app.js';
-    import { GetPeers, GeneratePairingCode, RequestPairing, UnpairPeer } from '../../wailsjs/go/main/App.js';
+    import { GetPeers, GeneratePairingCode, RequestPairing, UnpairPeer, RefreshPeers } from '../../wailsjs/go/main/App.js';
     import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime.js';
 
-    let myPairingCode = '';
-    let pairingInput = '';
-    let selectedPeer = null;
+    let myPairingCode = $state('');
+    let searchFilter = $state('');
+    let isScanning = $state(false);
+    let scanTimeout = $state(null);
+
+    // Filter and sort peers: paired first, then by name
+    const filteredPeers = $derived.by(() => {
+        const peerList = $peers || [];
+        return peerList
+            .filter(p => {
+                if (!searchFilter) return true;
+                const search = searchFilter.toLowerCase();
+                return p.name.toLowerCase().includes(search) ||
+                       p.host.toLowerCase().includes(search);
+            })
+            .sort((a, b) => {
+                // Paired devices first
+                if (a.paired && !b.paired) return -1;
+                if (!a.paired && b.paired) return 1;
+                // Then by online status
+                if (a.status === 'online' && b.status !== 'online') return -1;
+                if (a.status !== 'online' && b.status === 'online') return 1;
+                // Then by name
+                return a.name.localeCompare(b.name);
+            });
+    });
+
+    const pairedPeers = $derived(filteredPeers.filter(p => p.paired));
+    const otherPeers = $derived(filteredPeers.filter(p => !p.paired));
 
     onMount(async () => {
         await loadPeers();
         EventsOn('peers:changed', loadPeers);
+        // Start initial scan
+        startScan();
     });
 
     onDestroy(() => {
         EventsOff('peers:changed');
+        if (scanTimeout) clearTimeout(scanTimeout);
     });
 
     async function loadPeers() {
@@ -22,22 +52,35 @@
         peers.set(result || []);
     }
 
+    async function startScan() {
+        isScanning = true;
+        await loadPeers();
+        // Scan for 15 seconds
+        scanTimeout = setTimeout(() => {
+            isScanning = false;
+        }, 15000);
+    }
+
+    async function refreshDevices() {
+        if (scanTimeout) clearTimeout(scanTimeout);
+        isScanning = true;
+        try {
+            await RefreshPeers();
+        } catch (e) {
+            // RefreshPeers may not exist, just reload
+        }
+        await loadPeers();
+        scanTimeout = setTimeout(() => {
+            isScanning = false;
+        }, 15000);
+    }
+
     async function generateCode() {
         myPairingCode = await GeneratePairingCode();
     }
 
     async function startPairing(peer) {
-        selectedPeer = peer;
         showModal('pairing', peer);
-    }
-
-    async function submitPairing(peer, code) {
-        try {
-            await RequestPairing(peer.id, code);
-            pairingState.set({ code: '', isPairing: true, targetPeer: peer });
-        } catch (err) {
-            alert('Pairing failed: ' + err);
-        }
     }
 
     async function unpair(peer) {
@@ -49,10 +92,10 @@
 
     function getStatusColor(status) {
         switch (status) {
-            case 'online': return '#4ade80';
-            case 'syncing': return '#60a5fa';
-            case 'pairing': return '#fbbf24';
-            default: return '#6b7280';
+            case 'online': return 'bg-macos-green';
+            case 'syncing': return 'bg-macos-blue';
+            case 'pairing': return 'bg-macos-orange';
+            default: return 'bg-slate-500';
         }
     }
 
@@ -64,293 +107,157 @@
             default: return 'Offline';
         }
     }
+
+    function clearSearch() {
+        searchFilter = '';
+    }
+
+    function dismissCode() {
+        myPairingCode = '';
+    }
 </script>
 
-<div class="peer-list">
-    <div class="header">
-        <h2>Devices</h2>
-        <button class="btn-secondary" on:click={generateCode}>
-            Generate Pairing Code
-        </button>
+<div class="p-5 h-full flex flex-col">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-semibold">Devices</h2>
+        <div class="flex gap-2">
+            <button
+                class="flex items-center gap-1.5 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-slate-100 hover:bg-white/15 disabled:opacity-70 disabled:cursor-default transition-colors"
+                onclick={refreshDevices}
+                disabled={isScanning}
+            >
+                <RefreshCw size={16} class={isScanning ? 'animate-spin' : ''} />
+                {isScanning ? 'Scanning...' : 'Refresh'}
+            </button>
+            <button
+                class="flex items-center gap-1.5 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-slate-100 hover:bg-white/15 transition-colors"
+                onclick={generateCode}
+            >
+                Generate Pairing Code
+            </button>
+        </div>
     </div>
 
+    <!-- Search Bar -->
+    <div class="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-lg px-3.5 py-2.5 mb-4">
+        <Search size={18} class="text-slate-500 flex-shrink-0" />
+        <input
+            type="text"
+            placeholder="Filter devices by name or IP..."
+            bind:value={searchFilter}
+            class="flex-1 bg-transparent border-none text-slate-100 text-sm outline-none placeholder-slate-500"
+        />
+        {#if searchFilter}
+            <button
+                class="text-slate-500 hover:text-slate-400 p-0 border-none bg-transparent cursor-pointer"
+                onclick={clearSearch}
+            >
+                <X size={18} />
+            </button>
+        {/if}
+    </div>
+
+    <!-- Pairing Code Display -->
     {#if myPairingCode}
-        <div class="pairing-code-display">
-            <p>Share this code with another device to pair:</p>
-            <div class="code">{myPairingCode}</div>
-            <button class="btn-text" on:click={() => myPairingCode = ''}>Dismiss</button>
+        <div class="bg-macos-blue/10 border border-macos-blue/30 rounded-lg p-4 mb-4 text-center">
+            <p class="text-slate-400 mb-3">Share this code with another device to pair:</p>
+            <div class="text-3xl font-mono font-bold tracking-[8px] text-macos-blue p-3 bg-black/20 rounded">
+                {myPairingCode}
+            </div>
+            <button
+                class="mt-3 text-sm text-slate-500 hover:text-slate-400 bg-transparent border-none cursor-pointer"
+                onclick={dismissCode}
+            >
+                Dismiss
+            </button>
         </div>
     {/if}
 
-    <div class="peers">
-        {#if $peers.length === 0}
-            <div class="empty-state">
-                <p>No devices found on your network.</p>
-                <p class="hint">Make sure SyncDev is running on other Macs in your local network.</p>
+    <!-- Peers List -->
+    <div class="flex-1 overflow-y-auto">
+        {#if filteredPeers.length === 0}
+            <div class="text-center py-10 text-slate-500">
+                {#if searchFilter}
+                    <p>No devices match your search.</p>
+                {:else if isScanning}
+                    <p>Scanning for devices...</p>
+                    <p class="text-sm mt-2">Looking for other Macs running SyncDev on your network.</p>
+                {:else}
+                    <p>No devices found on your network.</p>
+                    <p class="text-sm mt-2">Make sure SyncDev is running on other Macs in your local network.</p>
+                {/if}
             </div>
         {:else}
-            {#each $peers as peer}
-                <div class="peer-card" class:paired={peer.paired}>
-                    <div class="peer-info">
-                        <div class="peer-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                                <path d="M8 21h8M12 17v4"/>
-                            </svg>
-                        </div>
-                        <div class="peer-details">
-                            <span class="peer-name">{peer.name}</span>
-                            <span class="peer-host">{peer.host}:{peer.port}</span>
-                        </div>
-                    </div>
-                    <div class="peer-status">
-                        <span class="status-indicator" style="background-color: {getStatusColor(peer.status)}"></span>
-                        <span class="status-text">{getStatusText(peer.status)}</span>
-                    </div>
-                    <div class="peer-actions">
-                        {#if peer.paired}
-                            <span class="paired-badge">Paired</span>
-                            <button class="btn-icon danger" on:click={() => unpair(peer)} title="Unpair">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M18 6L6 18M6 6l12 12"/>
-                                </svg>
-                            </button>
-                        {:else if peer.status === 'online'}
-                            <button class="btn-primary small" on:click={() => startPairing(peer)}>
-                                Pair
-                            </button>
-                        {/if}
-                    </div>
+            <!-- Paired Devices Section -->
+            {#if pairedPeers.length > 0}
+                <div class="flex items-center gap-2 mb-3 mt-2">
+                    <span class="text-xs font-semibold uppercase text-slate-500 tracking-wide">Paired Devices</span>
+                    <span class="text-[0.7rem] bg-white/10 text-slate-400 px-1.5 py-0.5 rounded-full">{pairedPeers.length}</span>
                 </div>
-            {/each}
+                {#each pairedPeers as peer}
+                    <div class="flex items-center gap-4 p-3.5 bg-macos-green/5 rounded-lg mb-2 border border-macos-green/30 hover:bg-macos-green/10 transition-colors">
+                        <div class="flex items-center gap-3 flex-1">
+                            <div class="w-10 h-10 flex items-center justify-center bg-macos-green/20 rounded-lg">
+                                <Monitor size={24} class="text-macos-green" />
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="font-medium text-slate-100">{peer.name}</span>
+                                <span class="text-xs text-slate-500 font-mono">{peer.host}:{peer.port}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class={`w-2 h-2 rounded-full ${getStatusColor(peer.status)}`}></span>
+                            <span class="text-sm text-slate-400">{getStatusText(peer.status)}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs px-2 py-1 bg-macos-green/20 text-macos-green rounded">Paired</span>
+                            <button
+                                class="p-1.5 rounded hover:bg-white/10 transition-colors group"
+                                onclick={() => unpair(peer)}
+                                title="Unpair"
+                            >
+                                <X size={16} class="text-slate-500 group-hover:text-red-500" />
+                            </button>
+                        </div>
+                    </div>
+                {/each}
+            {/if}
+
+            <!-- Available Devices Section -->
+            {#if otherPeers.length > 0}
+                <div class="flex items-center gap-2 mb-3 mt-2">
+                    <span class="text-xs font-semibold uppercase text-slate-500 tracking-wide">Available Devices</span>
+                    <span class="text-[0.7rem] bg-white/10 text-slate-400 px-1.5 py-0.5 rounded-full">{otherPeers.length}</span>
+                </div>
+                {#each otherPeers as peer}
+                    <div class="flex items-center gap-4 p-3.5 bg-white/5 rounded-lg mb-2 border border-transparent hover:bg-white/8 transition-colors">
+                        <div class="flex items-center gap-3 flex-1">
+                            <div class="w-10 h-10 flex items-center justify-center bg-white/10 rounded-lg">
+                                <Monitor size={24} class="text-slate-400" />
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="font-medium text-slate-100">{peer.name}</span>
+                                <span class="text-xs text-slate-500 font-mono">{peer.host}:{peer.port}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class={`w-2 h-2 rounded-full ${getStatusColor(peer.status)}`}></span>
+                            <span class="text-sm text-slate-400">{getStatusText(peer.status)}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            {#if peer.status === 'online'}
+                                <button
+                                    class="px-3 py-1.5 bg-macos-blue text-white text-xs font-medium rounded-md hover:bg-blue-600 transition-colors"
+                                    onclick={() => startPairing(peer)}
+                                >
+                                    Pair
+                                </button>
+                            {/if}
+                        </div>
+                    </div>
+                {/each}
+            {/if}
         {/if}
     </div>
 </div>
-
-<style>
-    .peer-list {
-        padding: 20px;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-
-    h2 {
-        margin: 0;
-        font-size: 1.5rem;
-        font-weight: 600;
-    }
-
-    .pairing-code-display {
-        background: rgba(59, 130, 246, 0.1);
-        border: 1px solid rgba(59, 130, 246, 0.3);
-        border-radius: 8px;
-        padding: 16px;
-        margin-bottom: 20px;
-        text-align: center;
-    }
-
-    .pairing-code-display p {
-        margin: 0 0 12px 0;
-        color: #94a3b8;
-    }
-
-    .code {
-        font-size: 2rem;
-        font-family: monospace;
-        font-weight: bold;
-        letter-spacing: 8px;
-        color: #60a5fa;
-        padding: 12px;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 4px;
-    }
-
-    .peers {
-        flex: 1;
-        overflow-y: auto;
-    }
-
-    .empty-state {
-        text-align: center;
-        padding: 40px;
-        color: #64748b;
-    }
-
-    .empty-state .hint {
-        font-size: 0.875rem;
-        margin-top: 8px;
-    }
-
-    .peer-card {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-        padding: 16px;
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 8px;
-        margin-bottom: 12px;
-        border: 1px solid transparent;
-        transition: all 0.2s;
-    }
-
-    .peer-card:hover {
-        background: rgba(255, 255, 255, 0.08);
-    }
-
-    .peer-card.paired {
-        border-color: rgba(74, 222, 128, 0.3);
-    }
-
-    .peer-info {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        flex: 1;
-    }
-
-    .peer-icon {
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 8px;
-    }
-
-    .peer-icon svg {
-        width: 24px;
-        height: 24px;
-        color: #94a3b8;
-    }
-
-    .peer-details {
-        display: flex;
-        flex-direction: column;
-    }
-
-    .peer-name {
-        font-weight: 500;
-        color: #f1f5f9;
-    }
-
-    .peer-host {
-        font-size: 0.75rem;
-        color: #64748b;
-        font-family: monospace;
-    }
-
-    .peer-status {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .status-indicator {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-    }
-
-    .status-text {
-        font-size: 0.875rem;
-        color: #94a3b8;
-    }
-
-    .peer-actions {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .paired-badge {
-        font-size: 0.75rem;
-        padding: 4px 8px;
-        background: rgba(74, 222, 128, 0.2);
-        color: #4ade80;
-        border-radius: 4px;
-    }
-
-    .btn-primary {
-        background: #3b82f6;
-        color: white;
-        border: none;
-        padding: 8px 16px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.875rem;
-        font-weight: 500;
-        transition: background 0.2s;
-    }
-
-    .btn-primary:hover {
-        background: #2563eb;
-    }
-
-    .btn-primary.small {
-        padding: 6px 12px;
-        font-size: 0.75rem;
-    }
-
-    .btn-secondary {
-        background: rgba(255, 255, 255, 0.1);
-        color: #f1f5f9;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 8px 16px;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.875rem;
-        transition: all 0.2s;
-    }
-
-    .btn-secondary:hover {
-        background: rgba(255, 255, 255, 0.15);
-    }
-
-    .btn-text {
-        background: none;
-        border: none;
-        color: #64748b;
-        cursor: pointer;
-        padding: 4px 8px;
-        font-size: 0.875rem;
-    }
-
-    .btn-text:hover {
-        color: #94a3b8;
-    }
-
-    .btn-icon {
-        background: none;
-        border: none;
-        padding: 6px;
-        cursor: pointer;
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background 0.2s;
-    }
-
-    .btn-icon svg {
-        width: 16px;
-        height: 16px;
-        color: #64748b;
-    }
-
-    .btn-icon:hover {
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    .btn-icon.danger:hover svg {
-        color: #ef4444;
-    }
-</style>
