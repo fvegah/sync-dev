@@ -4,6 +4,7 @@ import (
 	"SyncDev/internal/config"
 	"SyncDev/internal/models"
 	"SyncDev/internal/sync"
+	"SyncDev/internal/tray"
 	"fmt"
 	"log"
 	"os"
@@ -18,9 +19,11 @@ import (
 type App struct {
 	app         *application.App
 	window      *application.WebviewWindow
+	tray        *tray.Manager
 	configStore *config.Store
 	syncEngine  *sync.Engine
 	pairingCode string
+	paused      bool
 }
 
 // NewApp creates a new App application struct
@@ -29,9 +32,10 @@ func NewApp() *App {
 }
 
 // startup is called when the app starts
-func (a *App) startup(app *application.App, window *application.WebviewWindow) {
+func (a *App) startup(app *application.App, window *application.WebviewWindow, trayManager *tray.Manager) {
 	a.app = app
 	a.window = window
+	a.tray = trayManager
 
 	// Initialize config store
 	store, err := config.NewStore()
@@ -403,6 +407,31 @@ func (a *App) ShowWindow() {
 // QuitApp quits the application
 func (a *App) QuitApp() {
 	a.app.Quit()
+}
+
+// ============================================
+// Tray SyncActions Interface
+// ============================================
+
+// IsPaused returns whether sync is paused
+func (a *App) IsPaused() bool {
+	return a.paused
+}
+
+// Pause pauses automatic sync
+func (a *App) Pause() {
+	a.paused = true
+	if a.syncEngine != nil {
+		a.syncEngine.UpdateAutoSync(false)
+	}
+}
+
+// Resume resumes automatic sync
+func (a *App) Resume() {
+	a.paused = false
+	if a.syncEngine != nil {
+		a.syncEngine.UpdateAutoSync(a.configStore.Get().AutoSync)
+	}
 }
 
 // RefreshPeers triggers a peer discovery refresh
