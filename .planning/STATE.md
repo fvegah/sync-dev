@@ -21,16 +21,17 @@ SyncDev es una app de sincronizacion de archivos peer-to-peer para macOS constru
 | 1 | Keychain Security | Verified | 2/2 plans |
 | 2 | Menu Bar Integration | Verified | 3/3 plans |
 | 3 | Progress Display | Verified | 4/4 plans |
-| 4 | Native macOS UI | Complete | 3/3 plans |
+| 4 | Native macOS UI | In Progress | 4/5 plans |
 
-Progress: [##############################] 100%
+Progress: [############################--] 93%
 
 ## Next Action
 
-All phases complete. Ready for final verification with `/gsd:verify-phase 04`.
+Continue with plan 04-05 (SyncStatus and Settings migration).
 
 ## Recent Activity
 
+- 2026-01-23: Completed 04-04-PLAN.md (PeerList and FolderPairs Migration) - Svelte 5 runes, Lucide icons, Tailwind-only
 - 2026-01-23: Completed 04-03-PLAN.md (Stores and App Layout) - Svelte 5 stores and Finder-style sidebar
 - 2026-01-23: Completed 04-02-PLAN.md (shadcn-svelte Components) - Button and Card components with macOS styling
 - 2026-01-23: Completed 04-01-PLAN.md (Frontend Foundation) - Svelte 5 + Tailwind v4 with macOS theme
@@ -88,6 +89,8 @@ All phases complete. Ready for final verification with `/gsd:verify-phase 04`.
 | Icon library | Custom SVGs vs Lucide | Lucide | Consistent iconography, proper Svelte components |
 | Event syntax | on:click vs onclick | onclick | Svelte 5 standard event syntax |
 | App layout | Grid vs flexbox | Flexbox | Simple sidebar + content layout |
+| Derived state | $derived vs $derived.by | Both | Use $derived.by for complex multi-statement logic, $derived for simple expressions |
+| Modal accessibility | None vs ARIA roles | ARIA roles | Added role="dialog", aria-modal="true", tabindex="-1" for accessibility |
 
 ## Blockers
 
@@ -114,6 +117,7 @@ None currently.
 - `.planning/phases/04-native-macos-ui/04-01-SUMMARY.md` - Plan 04-01 completion summary
 - `.planning/phases/04-native-macos-ui/04-02-SUMMARY.md` - Plan 04-02 completion summary
 - `.planning/phases/04-native-macos-ui/04-03-SUMMARY.md` - Plan 04-03 completion summary
+- `.planning/phases/04-native-macos-ui/04-04-SUMMARY.md` - Plan 04-04 completion summary
 
 ## New Artifacts (Phase 1)
 
@@ -179,10 +183,15 @@ None currently.
 - `frontend/src/App.svelte` - Redesigned with Finder-style sidebar, Lucide icons, Tailwind-only
 - `frontend/src/main.js` - Updated to use Svelte 5 mount() API
 
+## New Artifacts (Phase 4 - Plan 04)
+
+- `frontend/src/lib/PeerList.svelte` - Migrated to Svelte 5 runes, Lucide icons, Tailwind-only
+- `frontend/src/lib/FolderPairs.svelte` - Migrated to Svelte 5 runes, Lucide icons, Tailwind-only
+
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 04-03-PLAN.md (Stores and App Layout)
+Stopped at: Completed 04-04-PLAN.md (PeerList and FolderPairs Migration)
 Resume file: None
 
 ## Session Handoff Notes
