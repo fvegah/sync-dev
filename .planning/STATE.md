@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-01-23
 **Current Phase:** 4 of 4 (Native macOS UI)
-**Status:** Complete
+**Status:** In Progress (04-05 Tasks 1-2 complete, awaiting human verification)
 
 ## Quick Context
 
@@ -27,10 +27,11 @@ Progress: [############################--] 93%
 
 ## Next Action
 
-Continue with plan 04-05 (SyncStatus and Settings migration).
+**Awaiting human verification for 04-05 Task 3** - Visual verification of complete macOS UI redesign.
 
 ## Recent Activity
 
+- 2026-01-23: 04-05 Tasks 1-2 complete (SyncStatus and Settings migration) - awaiting human verification for Task 3
 - 2026-01-23: Completed 04-04-PLAN.md (PeerList and FolderPairs Migration) - Svelte 5 runes, Lucide icons, Tailwind-only
 - 2026-01-23: Completed 04-03-PLAN.md (Stores and App Layout) - Svelte 5 stores and Finder-style sidebar
 - 2026-01-23: Completed 04-02-PLAN.md (shadcn-svelte Components) - Button and Card components with macOS styling
@@ -188,11 +189,16 @@ None currently.
 - `frontend/src/lib/PeerList.svelte` - Migrated to Svelte 5 runes, Lucide icons, Tailwind-only
 - `frontend/src/lib/FolderPairs.svelte` - Migrated to Svelte 5 runes, Lucide icons, Tailwind-only
 
+## New Artifacts (Phase 4 - Plan 05) - In Progress
+
+- `frontend/src/lib/SyncStatus.svelte` - Migrated to Svelte 5 runes ($state, $derived), Lucide icons, Tailwind-only, progress gradient
+- `frontend/src/lib/Settings.svelte` - Migrated to Svelte 5 runes ($state), Lucide ExternalLink, macOS form controls, Tailwind-only
+
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 04-04-PLAN.md (PeerList and FolderPairs Migration)
-Resume file: None
+Stopped at: 04-05 Tasks 1-2 complete (SyncStatus and Settings migration)
+Resume file: .planning/phases/04-native-macos-ui/04-05-PLAN.md (Task 3 checkpoint)
 
 ## Session Handoff Notes
 
