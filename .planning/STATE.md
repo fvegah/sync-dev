@@ -20,17 +20,19 @@ SyncDev es una app de sincronizacion de archivos peer-to-peer para macOS constru
 |-------|------|--------|----------|
 | 1 | Keychain Security | Verified | 2/2 plans |
 | 2 | Menu Bar Integration | Verified | 3/3 plans |
-| 3 | Progress Display | In Progress | 1/4 plans |
+| 3 | Progress Display | In Progress | 3/4 plans |
 | 4 | Native macOS UI | Not Started | 0/2 reqs |
 
-Progress: [########################......] 75%
+Progress: [##########################....] 80%
 
 ## Next Action
 
-Continue Phase 3 - execute plan 03-02 (Engine Integration) with `/gsd:execute-phase`.
+Continue Phase 3 - execute plan 03-04 (Engine Event Emission) with `/gsd:execute-phase`.
 
 ## Recent Activity
 
+- 2026-01-23: Completed 03-03-PLAN.md (Frontend Progress Display) - derived stores and enhanced UI for speed/ETA/file count
+- 2026-01-23: Completed 03-02-PLAN.md (Engine Integration) - ProgressAggregator integrated into sync engine
 - 2026-01-23: Completed 03-01-PLAN.md (Progress Backend Infrastructure) - ProgressAggregator with throttled emissions
 - 2026-01-22: Phase 2 verified - 11/11 must-haves passed (02-VERIFICATION.md)
 - 2026-01-22: Completed 02-03-PLAN.md (Dynamic State Icons) - tray icon updates based on sync status
@@ -66,6 +68,10 @@ Continue Phase 3 - execute plan 03-02 (Engine Integration) with `/gsd:execute-ph
 | Service binding | app.Bind vs RegisterService | RegisterService | v3 uses application.NewService[T] pattern |
 | Event emission | CustomEvent struct vs Emit(name, data) | Emit(name, data) | v3 simplified API |
 | Status-to-icon mapping | Granular states vs grouped | Grouped | StatusScanning and StatusSyncing both map to StateSyncing |
+| Speed formatting | Raw bytes vs human-readable | Human-readable | Auto-formats B/s, KB/s, MB/s based on magnitude |
+| ETA formatting | Raw seconds vs formatted | Formatted | Shows seconds, MM:SS, or HH:MM based on duration |
+| Store compatibility | Replace transferProgress vs alias | Alias | Keep transferProgress as alias for backward compatibility |
+| Active file display | All files vs first only | First only | Shows only first active file to keep UI clean |
 
 ## Blockers
 
@@ -85,6 +91,8 @@ None currently.
 - `.planning/phases/02-menu-bar-integration/02-03-SUMMARY.md` - Plan 02-03 completion summary
 - `.planning/phases/02-menu-bar-integration/02-VERIFICATION.md` - Phase 2 verification report
 - `.planning/phases/03-progress-display/03-01-SUMMARY.md` - Plan 03-01 completion summary
+- `.planning/phases/03-progress-display/03-02-SUMMARY.md` - Plan 03-02 completion summary
+- `.planning/phases/03-progress-display/03-03-SUMMARY.md` - Plan 03-03 completion summary
 
 ## New Artifacts (Phase 1)
 
@@ -116,10 +124,19 @@ None currently.
 - `internal/models/progress.go` - AggregateProgress and FileProgress structs
 - `internal/sync/progress.go` - ProgressAggregator with throttling and smoothing
 
+## New Artifacts (Phase 3 - Plan 02)
+
+- `internal/sync/engine.go` - Updated with ProgressAggregator integration
+
+## New Artifacts (Phase 3 - Plan 03)
+
+- `frontend/src/stores/app.js` - Added progressData and derived stores (formattedSpeed, formattedETA, fileCountProgress, overallPercentage, activeFiles)
+- `frontend/src/lib/SyncStatus.svelte` - Enhanced progress display with speed, ETA, file count, and active file
+
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 03-01-PLAN.md
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
 
 ## Session Handoff Notes
@@ -128,7 +145,7 @@ Para continuar en una nueva sesion:
 1. Leer este archivo para contexto rapido
 2. Revisar ROADMAP.md para entender las fases
 3. Ejecutar `/gsd:progress` para ver estado actual
-4. Continue Phase 3 with `/gsd:execute-phase` for plan 03-02
+4. Continue Phase 3 with `/gsd:execute-phase` for plan 03-04
 
 ---
 
