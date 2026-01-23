@@ -56,6 +56,12 @@ type Engine struct {
 	onEvent        func(*SyncEvent)
 	onPeerChange   func()
 
+	// Progress aggregation
+	progressAggregator    *ProgressAggregator
+	onAggregateProgress   func(*models.AggregateProgress)
+	onSyncStart           func()
+	onSyncEnd             func()
+
 	mu            sync.RWMutex
 	ctx           context.Context
 	cancel        context.CancelFunc
@@ -178,6 +184,50 @@ func (e *Engine) SetEventCallback(cb func(*SyncEvent)) {
 // SetPeerChangeCallback sets the peer change callback
 func (e *Engine) SetPeerChangeCallback(cb func()) {
 	e.onPeerChange = cb
+}
+
+// SetAggregateProgressCallback sets up the progress aggregator with a callback
+func (e *Engine) SetAggregateProgressCallback(cb func(*models.AggregateProgress)) {
+	e.onAggregateProgress = cb
+	e.progressAggregator = NewProgressAggregator(cb)
+}
+
+// SetSyncStartCallback sets the callback for sync start events
+func (e *Engine) SetSyncStartCallback(cb func()) {
+	e.onSyncStart = cb
+}
+
+// SetSyncEndCallback sets the callback for sync end events
+func (e *Engine) SetSyncEndCallback(cb func()) {
+	e.onSyncEnd = cb
+}
+
+// GetAggregateProgress returns the current aggregate progress
+func (e *Engine) GetAggregateProgress() *models.AggregateProgress {
+	if e.progressAggregator == nil {
+		return nil
+	}
+	return e.progressAggregator.GetProgress()
+}
+
+// NotifySyncStart notifies that a sync session has started
+func (e *Engine) NotifySyncStart(totalFiles int, totalBytes int64) {
+	if e.progressAggregator != nil {
+		e.progressAggregator.StartSync(totalFiles, totalBytes)
+	}
+	if e.onSyncStart != nil {
+		e.onSyncStart()
+	}
+}
+
+// NotifySyncEnd notifies that a sync session has ended
+func (e *Engine) NotifySyncEnd() {
+	if e.progressAggregator != nil {
+		e.progressAggregator.EndSync()
+	}
+	if e.onSyncEnd != nil {
+		e.onSyncEnd()
+	}
 }
 
 // GetStatus returns the current sync status
@@ -757,6 +807,24 @@ func (e *Engine) handleIndexExchange(conn *network.PeerConnection, msg *network.
 	// Compare indices
 	actions := CompareIndices(localIndex, remoteIndex)
 
+	// Calculate total files and bytes for sync
+	totalFiles := 0
+	var totalBytes int64
+	for _, action := range actions {
+		if action.Action == models.FileActionPush && action.LocalFile != nil && !action.LocalFile.IsDir {
+			totalFiles++
+			totalBytes += action.LocalFile.Size
+		} else if action.Action == models.FileActionPull && action.RemoteFile != nil && !action.RemoteFile.IsDir {
+			totalFiles++
+			totalBytes += action.RemoteFile.Size
+		}
+	}
+
+	// Notify sync start
+	if totalFiles > 0 {
+		e.NotifySyncStart(totalFiles, totalBytes)
+	}
+
 	// Execute actions
 	for _, action := range actions {
 		switch action.Action {
@@ -765,6 +833,11 @@ func (e *Engine) handleIndexExchange(conn *network.PeerConnection, msg *network.
 		case models.FileActionPull:
 			e.pullFile(conn, fp, action.RemoteFile)
 		}
+	}
+
+	// Notify sync end
+	if totalFiles > 0 {
+		e.NotifySyncEnd()
 	}
 
 	// Send our index back
@@ -791,8 +864,15 @@ func (e *Engine) pushFile(conn *network.PeerConnection, fp *models.FolderPair, f
 		e.mu.Lock()
 		e.progress = p
 		e.mu.Unlock()
+
+		// Legacy callback for backward compatibility
 		if e.onProgress != nil {
 			e.onProgress(p)
+		}
+
+		// Feed progress to aggregator
+		if e.progressAggregator != nil {
+			e.progressAggregator.UpdateFile(p.FileName, p.TotalBytes, p.TransferBytes)
 		}
 	}
 
@@ -807,6 +887,11 @@ func (e *Engine) pushFile(conn *network.PeerConnection, fp *models.FolderPair, f
 			Description: fmt.Sprintf("Push failed: %v", err),
 		})
 		return
+	}
+
+	// Mark file complete in aggregator
+	if e.progressAggregator != nil {
+		e.progressAggregator.CompleteFile(fileInfo.Path, fileInfo.Size)
 	}
 
 	e.addEvent(&SyncEvent{
@@ -899,8 +984,15 @@ func (e *Engine) handleFileChunk(conn *network.PeerConnection, msg *network.Mess
 			e.mu.Lock()
 			e.progress = p
 			e.mu.Unlock()
+
+			// Legacy callback for backward compatibility
 			if e.onProgress != nil {
 				e.onProgress(p)
+			}
+
+			// Feed progress to aggregator
+			if e.progressAggregator != nil {
+				e.progressAggregator.UpdateFile(p.FileName, p.TotalBytes, p.TransferBytes)
 			}
 		})
 		if err != nil {
@@ -923,6 +1015,14 @@ func (e *Engine) handleFileChunk(conn *network.PeerConnection, msg *network.Mess
 	}
 
 	if payload.IsLast {
+		// Mark file complete in aggregator before finalize
+		if e.progressAggregator != nil {
+			// Get file size from receiver progress
+			if e.progress != nil {
+				e.progressAggregator.CompleteFile(payload.FilePath, e.progress.TotalBytes)
+			}
+		}
+
 		if err := receiver.Finalize(); err != nil {
 			log.Printf("Failed to finalize file: %v", err)
 		}
