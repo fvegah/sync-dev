@@ -4,7 +4,6 @@ import (
 	"SyncDev/internal/config"
 	"SyncDev/internal/models"
 	"SyncDev/internal/sync"
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -12,15 +11,16 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 // App struct
 type App struct {
-	ctx          context.Context
-	configStore  *config.Store
-	syncEngine   *sync.Engine
-	pairingCode  string
+	app         *application.App
+	window      *application.WebviewWindow
+	configStore *config.Store
+	syncEngine  *sync.Engine
+	pairingCode string
 }
 
 // NewApp creates a new App application struct
@@ -29,8 +29,9 @@ func NewApp() *App {
 }
 
 // startup is called when the app starts
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func (a *App) startup(app *application.App, window *application.WebviewWindow) {
+	a.app = app
+	a.window = window
 
 	// Initialize config store
 	store, err := config.NewStore()
@@ -48,24 +49,24 @@ func (a *App) startup(ctx context.Context) {
 	}
 	a.syncEngine = engine
 
-	// Set up callbacks
+	// Set up callbacks - emit events via app.Event.Emit
 	engine.SetStatusCallback(func(status sync.SyncStatus, action string) {
-		runtime.EventsEmit(ctx, "sync:status", map[string]interface{}{
+		a.app.Event.Emit("sync:status", map[string]interface{}{
 			"status": status,
 			"action": action,
 		})
 	})
 
 	engine.SetProgressCallback(func(progress *models.TransferProgress) {
-		runtime.EventsEmit(ctx, "sync:progress", progress)
+		a.app.Event.Emit("sync:progress", progress)
 	})
 
 	engine.SetEventCallback(func(event *sync.SyncEvent) {
-		runtime.EventsEmit(ctx, "sync:event", event)
+		a.app.Event.Emit("sync:event", event)
 	})
 
 	engine.SetPeerChangeCallback(func() {
-		runtime.EventsEmit(ctx, "peers:changed", nil)
+		a.app.Event.Emit("peers:changed", nil)
 	})
 
 	// Start sync engine
@@ -77,7 +78,7 @@ func (a *App) startup(ctx context.Context) {
 }
 
 // shutdown is called when the app is closing
-func (a *App) shutdown(ctx context.Context) {
+func (a *App) shutdown() {
 	if a.syncEngine != nil {
 		a.syncEngine.Stop()
 	}
@@ -104,16 +105,24 @@ func (a *App) UpdateSyncInterval(mins int) error {
 	if mins < 1 || mins > 60 {
 		return fmt.Errorf("interval must be between 1 and 60 minutes")
 	}
-	return a.configStore.Update(func(c *config.Config) {
+	err := a.configStore.Update(func(c *config.Config) {
 		c.SyncIntervalMins = mins
 	})
+	if err == nil && a.syncEngine != nil {
+		a.syncEngine.RestartScheduler()
+	}
+	return err
 }
 
 // UpdateAutoSync updates the auto sync setting
 func (a *App) UpdateAutoSync(enabled bool) error {
-	return a.configStore.Update(func(c *config.Config) {
+	err := a.configStore.Update(func(c *config.Config) {
 		c.AutoSync = enabled
 	})
+	if err == nil && a.syncEngine != nil {
+		a.syncEngine.UpdateAutoSync(enabled)
+	}
+	return err
 }
 
 // UpdateGlobalExclusions updates the global exclusion patterns
@@ -313,10 +322,12 @@ func (a *App) GetRecentEvents() []*sync.SyncEvent {
 // SelectFolder opens a folder picker dialog
 func (a *App) SelectFolder() (string, error) {
 	homeDir, _ := os.UserHomeDir()
-	result, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
-		Title:            "Select Folder to Sync",
-		DefaultDirectory: homeDir,
-	})
+	result, err := a.app.Dialog.OpenFile().
+		SetTitle("Select Folder to Sync").
+		SetDirectory(homeDir).
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		PromptForSingleSelection()
 	if err != nil {
 		return "", err
 	}
@@ -375,5 +386,39 @@ func (a *App) GetDataDirectory() string {
 // OpenDataDirectory opens the data directory in Finder
 func (a *App) OpenDataDirectory() {
 	dataDir := a.GetDataDirectory()
-	runtime.BrowserOpenURL(a.ctx, "file://"+dataDir)
+	a.app.Browser.OpenFile(dataDir)
+}
+
+// MinimizeToTray hides the window to system tray
+func (a *App) MinimizeToTray() {
+	a.window.Hide()
+}
+
+// ShowWindow shows and focuses the main window
+func (a *App) ShowWindow() {
+	a.window.Show()
+	a.window.Focus()
+}
+
+// QuitApp quits the application
+func (a *App) QuitApp() {
+	a.app.Quit()
+}
+
+// RefreshPeers triggers a peer discovery refresh
+func (a *App) RefreshPeers() error {
+	if a.syncEngine == nil {
+		return fmt.Errorf("sync engine not initialized")
+	}
+	// The discovery is continuously running, just refresh UI
+	a.app.Event.Emit("peers:changed", nil)
+	return nil
+}
+
+// AnalyzeFolderPair returns a preview of what would be synced
+func (a *App) AnalyzeFolderPair(folderPairID string) (*sync.SyncPreview, error) {
+	if a.syncEngine == nil {
+		return nil, fmt.Errorf("sync engine not initialized")
+	}
+	return a.syncEngine.AnalyzeFolderPair(folderPairID)
 }
