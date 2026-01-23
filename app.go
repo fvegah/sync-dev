@@ -81,6 +81,11 @@ func (a *App) startup(app *application.App, window *application.WebviewWindow, t
 
 	engine.SetEventCallback(func(event *sync.SyncEvent) {
 		a.app.Event.Emit("sync:event", event)
+
+		// Set error state on failure events
+		if a.tray != nil && event.Type == "error" {
+			a.tray.SetState(tray.StateError)
+		}
 	})
 
 	engine.SetPeerChangeCallback(func() {
