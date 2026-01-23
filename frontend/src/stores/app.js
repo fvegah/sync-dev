@@ -1,15 +1,15 @@
 import { writable, derived } from 'svelte/store';
 
-// Current tab
+// Current tab - navigation state
 export const currentTab = writable('peers');
 
-// Peers list
+// Peers list from backend
 export const peers = writable([]);
 
-// Folder pairs
+// Folder pairs configuration
 export const folderPairs = writable([]);
 
-// Sync status
+// Sync status from backend
 export const syncStatus = writable({
     status: 'idle',
     action: ''
@@ -18,11 +18,11 @@ export const syncStatus = writable({
 // Raw progress data from backend (AggregateProgress shape)
 export const progressData = writable(null);
 
-// Keep transferProgress as alias for backward compatibility
+// Backward compatibility alias
 export const transferProgress = progressData;
 
 // Derived: formatted speed string
-export const formattedSpeed = derived(progressData, $p => {
+export const formattedSpeed = derived(progressData, ($p) => {
     if (!$p || !$p.bytesPerSecond || $p.bytesPerSecond <= 0) return '';
     const speed = $p.bytesPerSecond;
     if (speed >= 1024 * 1024) {
@@ -34,7 +34,7 @@ export const formattedSpeed = derived(progressData, $p => {
 });
 
 // Derived: formatted ETA string
-export const formattedETA = derived(progressData, $p => {
+export const formattedETA = derived(progressData, ($p) => {
     if (!$p || !$p.eta || $p.eta < 0) return '';
     const eta = $p.eta;
     if (eta < 60) {
@@ -51,23 +51,23 @@ export const formattedETA = derived(progressData, $p => {
 });
 
 // Derived: file count string
-export const fileCountProgress = derived(progressData, $p => {
+export const fileCountProgress = derived(progressData, ($p) => {
     if (!$p || !$p.totalFiles) return '';
     return `${$p.completedFiles} of ${$p.totalFiles} files`;
 });
 
 // Derived: is syncing
-export const isSyncing = derived(progressData, $p => {
+export const isSyncing = derived(progressData, ($p) => {
     return $p?.status === 'syncing';
 });
 
 // Derived: overall percentage
-export const overallPercentage = derived(progressData, $p => {
+export const overallPercentage = derived(progressData, ($p) => {
     return $p?.percentage ?? 0;
 });
 
-// Derived: active files list (for file progress list)
-export const activeFiles = derived(progressData, $p => {
+// Derived: active files list
+export const activeFiles = derived(progressData, ($p) => {
     return $p?.activeFiles ?? [];
 });
 
