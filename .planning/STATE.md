@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-01-23
 **Current Phase:** 4 of 4 (Native macOS UI)
-**Status:** Not Started
+**Status:** In Progress
 
 ## Quick Context
 
@@ -21,16 +21,17 @@ SyncDev es una app de sincronizacion de archivos peer-to-peer para macOS constru
 | 1 | Keychain Security | Verified | 2/2 plans |
 | 2 | Menu Bar Integration | Verified | 3/3 plans |
 | 3 | Progress Display | Verified | 4/4 plans |
-| 4 | Native macOS UI | Not Started | 0/2 reqs |
+| 4 | Native macOS UI | In Progress | 1/2 plans |
 
-Progress: [############################..] 90%
+Progress: [#############################.] 93%
 
 ## Next Action
 
-Start Phase 4 - plan Native macOS UI with `/gsd:plan-phase phase:04-native-macos-ui`.
+Continue Phase 4 - execute plan 04-02 (shadcn-svelte integration) with `/gsd:execute-phase 04-02`.
 
 ## Recent Activity
 
+- 2026-01-23: Completed 04-01-PLAN.md (Frontend Foundation) - Svelte 5 + Tailwind v4 with macOS theme
 - 2026-01-23: Phase 3 verified - all 4 PROG requirements passed (03-VERIFICATION.md)
 - 2026-01-23: Fixed app freeze bug by removing timer-based throttling (2f19aff)
 - 2026-01-23: Completed 03-04-PLAN.md (Active Files List) - per-file progress bars in UI
@@ -75,6 +76,9 @@ Start Phase 4 - plan Native macOS UI with `/gsd:plan-phase phase:04-native-macos
 | ETA formatting | Raw seconds vs formatted | Formatted | Shows seconds, MM:SS, or HH:MM based on duration |
 | Store compatibility | Replace transferProgress vs alias | Alias | Keep transferProgress as alias for backward compatibility |
 | Active file display | All files vs first only | First only | Shows only first active file to keep UI clean |
+| Svelte 5 runes mode | Strict (runes: true) vs compatibility | Compatibility mode | Allows both $: and $derived syntax during gradual migration |
+| Vite version | Keep v3 vs upgrade to v7 | Upgrade to v7 | Required for Svelte 5 plugin peer dependencies |
+| Tailwind PostCSS plugin | tailwindcss vs @tailwindcss/postcss | @tailwindcss/postcss | Tailwind v4 moved plugin to separate package |
 
 ## Blockers
 
@@ -98,6 +102,7 @@ None currently.
 - `.planning/phases/03-progress-display/03-03-SUMMARY.md` - Plan 03-03 completion summary
 - `.planning/phases/03-progress-display/03-04-SUMMARY.md` - Plan 03-04 completion summary
 - `.planning/phases/03-progress-display/03-VERIFICATION.md` - Phase 3 verification report
+- `.planning/phases/04-native-macos-ui/04-01-SUMMARY.md` - Plan 04-01 completion summary
 
 ## New Artifacts (Phase 1)
 
@@ -138,10 +143,18 @@ None currently.
 - `frontend/src/stores/app.js` - Added progressData and derived stores (formattedSpeed, formattedETA, fileCountProgress, overallPercentage, activeFiles)
 - `frontend/src/lib/SyncStatus.svelte` - Enhanced progress display with speed, ETA, file count, and active file
 
+## New Artifacts (Phase 4 - Plan 01)
+
+- `frontend/svelte.config.js` - Svelte 5 config with vitePreprocess and compatibility mode
+- `frontend/tailwind.config.js` - macOS color tokens, system font, darkMode: 'media'
+- `frontend/postcss.config.js` - @tailwindcss/postcss plugin configuration
+- `frontend/src/app.css` - Tailwind imports, global styles, dark/light mode, vibrancy utility
+- `frontend/package.json` - Updated to Svelte 5.48.0, Vite 7.3.1, Tailwind v4.1.18, lucide-svelte
+
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Phase 3 verified, ready for Phase 4
+Stopped at: Completed 04-01-PLAN.md (Frontend Foundation)
 Resume file: None
 
 ## Session Handoff Notes
