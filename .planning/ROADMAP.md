@@ -2,24 +2,24 @@
 
 **Milestone:** v1.1 - UX Improvements
 **Created:** 2026-01-22
-**Status:** In Progress (Phase 2 Complete)
+**Status:** In Progress (Phase 3 Planned)
 
 ## Milestone Goal
 
-Transformar SyncDev de una app funcional pero básica a una aplicación de sincronización profesional con:
-- Presencia en la barra de menú de macOS (system tray)
-- Visibilidad completa del progreso de sincronización
+Transformar SyncDev de una app funcional pero basica a una aplicacion de sincronizacion profesional con:
+- Presencia en la barra de menu de macOS (system tray)
+- Visibilidad completa del progreso de sincronizacion
 - Interfaz nativa que se sienta como una app de Apple
 - Almacenamiento seguro de secrets en Keychain
 
 ## Success Criteria
 
 Al completar este milestone:
-1. El usuario puede cerrar la ventana y la app sigue corriendo en la barra de menú
-2. El ícono de la barra de menú indica claramente el estado (idle, sincronizando, error)
+1. El usuario puede cerrar la ventana y la app sigue corriendo en la barra de menu
+2. El icono de la barra de menu indica claramente el estado (idle, sincronizando, error)
 3. El usuario ve progreso detallado: global, por archivo, velocidad y tiempo restante
 4. La UI se siente nativa de macOS (como Finder o System Preferences)
-5. Los shared secrets están almacenados de forma segura en Keychain
+5. Los shared secrets estan almacenados de forma segura en Keychain
 
 ## Phases
 
@@ -48,19 +48,19 @@ Plans:
 
 **Success Criteria:**
 - [x] Secrets se guardan en Keychain, no en config.json
-- [x] Migración automática de secrets existentes
+- [x] Migracion automatica de secrets existentes
 - [x] App funciona sin prompts molestos de Keychain (go-keyring usa /usr/bin/security)
 
 ---
 
 ### Phase 2: Menu Bar Integration ✓
 **Status:** Complete (2026-01-22)
-**Goal:** App vive en la barra de menú de macOS como una app de sincronización profesional
+**Goal:** App vive en la barra de menu de macOS como una app de sincronizacion profesional
 
 **Requirements:**
 - [x] TRAY-01: App se minimiza a system tray al cerrar ventana
-- [x] TRAY-02: Menú contextual (Sync ahora, Pausar, Abrir, Salir)
-- [x] TRAY-03: Ícono cambia según estado (idle, sincronizando, error)
+- [x] TRAY-02: Menu contextual (Sync ahora, Pausar, Abrir, Salir)
+- [x] TRAY-03: Icono cambia segun estado (idle, sincronizando, error)
 
 **Approach:**
 - Migrated to Wails v3 for native system tray support
@@ -79,45 +79,51 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Wails v3 Migration (window hide-on-close, remove v2)
 - [x] 02-02-PLAN.md — System Tray Implementation (tray manager, context menu, icons)
-- [x] 02-03-PLAN.md — Dynamic Icon States (status→tray state mapping)
+- [x] 02-03-PLAN.md — Dynamic Icon States (status->tray state mapping)
 
 **Success Criteria:**
-- [x] Cerrar ventana minimiza a barra de menú
-- [x] Ícono muestra 3 estados: idle, syncing, error
-- [x] Menú tiene: "Sync Now", "Pause/Resume", "Open SyncDev", separador, "Quit"
+- [x] Cerrar ventana minimiza a barra de menu
+- [x] Icono muestra 3 estados: idle, syncing, error
+- [x] Menu tiene: "Sync Now", "Pause/Resume", "Open SyncDev", separador, "Quit"
 
 ---
 
 ### Phase 3: Progress Display
-**Goal:** Usuario tiene visibilidad completa del progreso de sincronización
+**Status:** Planned (2026-01-22)
+**Goal:** Usuario tiene visibilidad completa del progreso de sincronizacion
 
 **Requirements:**
 - [ ] PROG-01: Barra de progreso global (% total)
 - [ ] PROG-02: Barra de progreso por archivo individual
 - [ ] PROG-03: Velocidad (MB/s) y tiempo estimado restante
-- [ ] PROG-04: Lista en tiempo real de archivos sincronizándose
+- [ ] PROG-04: Lista en tiempo real de archivos sincronizandose
 
 **Approach:**
-- Throttling de callbacks a 10-20 Hz para evitar freeze de UI
-- Exponential smoothing para ETA estable (evitar saltos)
-- Limitar lista de archivos a 100 items máximo
+- ProgressAggregator en Go para throttling a ~15 Hz
+- Exponential smoothing (alpha=0.1) para ETA estable
+- Limitar lista de archivos activos a 10 items
 
 **Key Files:**
-- `internal/sync/engine.go` - Agregar callbacks de progreso por archivo
-- `internal/sync/transfer.go` - Emitir eventos de progreso
-- `frontend/src/lib/SyncStatus.svelte` - Rediseñar con barras de progreso
-- `frontend/src/stores/app.js` - Nuevo store para progreso
+- `internal/models/progress.go` - AggregateProgress y FileProgress structs
+- `internal/sync/progress.go` - ProgressAggregator implementation
+- `internal/sync/engine.go` - Aggregator integration
+- `frontend/src/stores/app.js` - Derived stores para speed/ETA
+- `frontend/src/lib/SyncStatus.svelte` - Enhanced progress UI
 
-**Risks:**
-- Engine actual (1,247 líneas) es monolítico, refactoring puede ser necesario
-- File transfers usan base64 (ineficiente), puede afectar precisión de velocidad
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Backend progress aggregator with throttling and smoothing
+- [ ] 03-02-PLAN.md — Engine integration with ProgressAggregator
+- [ ] 03-03-PLAN.md — Frontend progress UI with speed and ETA display
+- [ ] 03-04-PLAN.md — Active files list and human verification
 
 **Success Criteria:**
 - [ ] Barra de progreso global muestra % completado
 - [ ] Barra de progreso por archivo durante transferencia
 - [ ] Velocidad en MB/s actualizada cada 1-2 segundos
 - [ ] ETA estable (no salta entre valores)
-- [ ] Lista muestra archivos activos (max 100)
+- [ ] Lista muestra archivos activos (max 10)
 
 ---
 
@@ -125,30 +131,30 @@ Plans:
 **Goal:** Interfaz que se siente como una app nativa de Apple
 
 **Requirements:**
-- [ ] UI-01: Rediseño con estilo macOS nativo
+- [ ] UI-01: Rediseno con estilo macOS nativo
 - [ ] UI-02: Componentes siguiendo Apple Human Interface Guidelines
 
 **Approach:**
 - Upgrade a Svelte 5 + shadcn-svelte + Tailwind CSS
-- SF Symbols para iconografía
+- SF Symbols para iconografia
 - Colores del sistema (--system-blue, etc.)
-- Sidebar translúcida estilo Finder
+- Sidebar translucida estilo Finder
 - Modo claro/oscuro siguiendo preferencias del sistema
 
 **Key Files:**
 - `frontend/src/App.svelte` - Layout con sidebar
-- `frontend/src/lib/*.svelte` - Rediseñar todos los componentes
+- `frontend/src/lib/*.svelte` - Redisenar todos los componentes
 - `frontend/package.json` - Agregar dependencias UI
 
 **Risks:**
-- Svelte 3 → 5 puede requerir cambios significativos
-- shadcn-svelte es relativamente nuevo, documentación limitada
+- Svelte 3 -> 5 puede requerir cambios significativos
+- shadcn-svelte es relativamente nuevo, documentacion limitada
 
 **Success Criteria:**
-- [ ] Sidebar estilo Finder con navegación
+- [ ] Sidebar estilo Finder con navegacion
 - [ ] Iconos SF Symbols en toda la UI
-- [ ] Colores del sistema para estados (azul selección, rojo error, verde éxito)
-- [ ] Modo oscuro/claro automático
+- [ ] Colores del sistema para estados (azul seleccion, rojo error, verde exito)
+- [ ] Modo oscuro/claro automatico
 - [ ] Fuente SF Pro o sistema por defecto
 
 ---
@@ -162,8 +168,8 @@ Phase 2 (Menu Bar) ──┘
 ```
 
 - **Phase 1** y **Phase 2** pueden ejecutarse en paralelo (sin dependencias)
-- **Phase 3** requiere Phase 2 para mostrar estado en ícono del tray
-- **Phase 4** debe ser última para pulir la UI completa
+- **Phase 3** requiere Phase 2 para mostrar estado en icono del tray
+- **Phase 4** debe ser ultima para pulir la UI completa
 
 ## Requirement Mapping
 
