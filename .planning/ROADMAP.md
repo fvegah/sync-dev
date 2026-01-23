@@ -2,7 +2,7 @@
 
 **Milestone:** v1.1 - UX Improvements
 **Created:** 2026-01-22
-**Status:** In Progress (Phase 4 Not Started)
+**Status:** In Progress (Phase 4 Planned)
 
 ## Milestone Goal
 
@@ -128,6 +128,7 @@ Plans:
 ---
 
 ### Phase 4: Native macOS UI
+**Status:** Planned (2026-01-23)
 **Goal:** Interfaz que se siente como una app nativa de Apple
 
 **Requirements:**
@@ -135,24 +136,30 @@ Plans:
 - [ ] UI-02: Componentes siguiendo Apple Human Interface Guidelines
 
 **Approach:**
-- Upgrade a Svelte 5 + shadcn-svelte + Tailwind CSS
-- SF Symbols para iconografia
-- Colores del sistema (--system-blue, etc.)
-- Sidebar translucida estilo Finder
+- Upgrade a Svelte 5 + Tailwind CSS v4
+- Lucide icons para iconografia (SF Symbols no permitido para web)
+- Colores del sistema (macos-blue, macos-green, macos-red)
+- Sidebar translucida estilo Finder con backdrop-blur
 - Modo claro/oscuro siguiendo preferencias del sistema
 
 **Key Files:**
-- `frontend/src/App.svelte` - Layout con sidebar
-- `frontend/src/lib/*.svelte` - Redisenar todos los componentes
-- `frontend/package.json` - Agregar dependencias UI
+- `frontend/package.json` - Svelte 5, Tailwind v4, lucide-svelte
+- `frontend/src/App.svelte` - Layout con sidebar vibrancy
+- `frontend/src/lib/*.svelte` - Componentes migrados a Svelte 5 runes
+- `frontend/src/lib/components/ui/` - shadcn-style Button, Card
 
-**Risks:**
-- Svelte 3 -> 5 puede requerir cambios significativos
-- shadcn-svelte es relativamente nuevo, documentacion limitada
+**Plans:** 5 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Svelte 5 + Tailwind v4 foundation upgrade
+- [ ] 04-02-PLAN.md — shadcn-svelte UI components (Button, Card)
+- [ ] 04-03-PLAN.md — Migrate stores and App.svelte with Finder sidebar
+- [ ] 04-04-PLAN.md — Migrate PeerList and FolderPairs components
+- [ ] 04-05-PLAN.md — Migrate SyncStatus and Settings + visual verification
 
 **Success Criteria:**
 - [ ] Sidebar estilo Finder con navegacion
-- [ ] Iconos SF Symbols en toda la UI
+- [ ] Iconos Lucide en toda la UI
 - [ ] Colores del sistema para estados (azul seleccion, rojo error, verde exito)
 - [ ] Modo oscuro/claro automatico
 - [ ] Fuente SF Pro o sistema por defecto
@@ -198,3 +205,4 @@ Phase 2 (Menu Bar) ──┘
 ---
 
 *Roadmap created: 2026-01-22*
+*Phase 4 planned: 2026-01-23*
