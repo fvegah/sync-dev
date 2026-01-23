@@ -2,7 +2,7 @@
 
 **Milestone:** v1.1 - UX Improvements
 **Created:** 2026-01-22
-**Status:** In Progress (Phase 3 Planned)
+**Status:** In Progress (Phase 4 Not Started)
 
 ## Milestone Goal
 
@@ -88,15 +88,15 @@ Plans:
 
 ---
 
-### Phase 3: Progress Display
-**Status:** Planned (2026-01-22)
+### Phase 3: Progress Display ✓
+**Status:** Complete (2026-01-23)
 **Goal:** Usuario tiene visibilidad completa del progreso de sincronizacion
 
 **Requirements:**
-- [ ] PROG-01: Barra de progreso global (% total)
-- [ ] PROG-02: Barra de progreso por archivo individual
-- [ ] PROG-03: Velocidad (MB/s) y tiempo estimado restante
-- [ ] PROG-04: Lista en tiempo real de archivos sincronizandose
+- [x] PROG-01: Barra de progreso global (% total)
+- [x] PROG-02: Barra de progreso por archivo individual
+- [x] PROG-03: Velocidad (MB/s) y tiempo estimado restante
+- [x] PROG-04: Lista en tiempo real de archivos sincronizandose
 
 **Approach:**
 - ProgressAggregator en Go para throttling a ~15 Hz
@@ -110,20 +110,20 @@ Plans:
 - `frontend/src/stores/app.js` - Derived stores para speed/ETA
 - `frontend/src/lib/SyncStatus.svelte` - Enhanced progress UI
 
-**Plans:** 4 plans
+**Plans:** 4/4 complete
 
 Plans:
-- [ ] 03-01-PLAN.md — Backend progress aggregator with throttling and smoothing
-- [ ] 03-02-PLAN.md — Engine integration with ProgressAggregator
-- [ ] 03-03-PLAN.md — Frontend progress UI with speed and ETA display
-- [ ] 03-04-PLAN.md — Active files list and human verification
+- [x] 03-01-PLAN.md — Backend progress aggregator with throttling and smoothing
+- [x] 03-02-PLAN.md — Engine integration with ProgressAggregator
+- [x] 03-03-PLAN.md — Frontend progress UI with speed and ETA display
+- [x] 03-04-PLAN.md — Active files list and human verification
 
 **Success Criteria:**
-- [ ] Barra de progreso global muestra % completado
-- [ ] Barra de progreso por archivo durante transferencia
-- [ ] Velocidad en MB/s actualizada cada 1-2 segundos
-- [ ] ETA estable (no salta entre valores)
-- [ ] Lista muestra archivos activos (max 10)
+- [x] Barra de progreso global muestra % completado
+- [x] Barra de progreso por archivo durante transferencia
+- [x] Velocidad en MB/s actualizada cada 1-2 segundos
+- [x] ETA estable (no salta entre valores)
+- [x] Lista muestra archivos activos (max 10)
 
 ---
 
