@@ -75,8 +75,22 @@ func (a *App) startup(app *application.App, window *application.WebviewWindow, t
 		}
 	})
 
+	// Legacy per-file progress callback (for backward compatibility)
 	engine.SetProgressCallback(func(progress *models.TransferProgress) {
+		a.app.Event.Emit("sync:file-progress", progress)
+	})
+
+	// Aggregate progress callback (throttled, for main UI)
+	engine.SetAggregateProgressCallback(func(progress *models.AggregateProgress) {
 		a.app.Event.Emit("sync:progress", progress)
+	})
+
+	// Sync lifecycle events
+	engine.SetSyncStartCallback(func() {
+		a.app.Event.Emit("sync:start", nil)
+	})
+	engine.SetSyncEndCallback(func() {
+		a.app.Event.Emit("sync:end", nil)
 	})
 
 	engine.SetEventCallback(func(event *sync.SyncEvent) {
@@ -322,12 +336,20 @@ func (a *App) GetSyncStatus() map[string]interface{} {
 	}
 }
 
-// GetSyncProgress returns the current transfer progress
+// GetSyncProgress returns the current transfer progress (legacy, per-file)
 func (a *App) GetSyncProgress() *models.TransferProgress {
 	if a.syncEngine == nil {
 		return nil
 	}
 	return a.syncEngine.GetProgress()
+}
+
+// GetAggregateProgress returns the aggregate sync progress (throttled)
+func (a *App) GetAggregateProgress() *models.AggregateProgress {
+	if a.syncEngine == nil {
+		return nil
+	}
+	return a.syncEngine.GetAggregateProgress()
 }
 
 // GetRecentEvents returns recent sync events
