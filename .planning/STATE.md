@@ -21,16 +21,17 @@ SyncDev es una app de sincronizacion de archivos peer-to-peer para macOS constru
 | 1 | Keychain Security | Verified | 2/2 plans |
 | 2 | Menu Bar Integration | Verified | 3/3 plans |
 | 3 | Progress Display | Verified | 4/4 plans |
-| 4 | Native macOS UI | In Progress | 1/2 plans |
+| 4 | Native macOS UI | Complete | 2/2 plans |
 
-Progress: [#############################.] 93%
+Progress: [##############################] 100%
 
 ## Next Action
 
-Continue Phase 4 - execute plan 04-02 (shadcn-svelte integration) with `/gsd:execute-phase 04-02`.
+Phase 4 complete. Ready for verification with `/gsd:verify-phase 04`.
 
 ## Recent Activity
 
+- 2026-01-23: Completed 04-02-PLAN.md (shadcn-svelte Components) - Button and Card components with macOS styling
 - 2026-01-23: Completed 04-01-PLAN.md (Frontend Foundation) - Svelte 5 + Tailwind v4 with macOS theme
 - 2026-01-23: Phase 3 verified - all 4 PROG requirements passed (03-VERIFICATION.md)
 - 2026-01-23: Fixed app freeze bug by removing timer-based throttling (2f19aff)
@@ -79,6 +80,10 @@ Continue Phase 4 - execute plan 04-02 (shadcn-svelte integration) with `/gsd:exe
 | Svelte 5 runes mode | Strict (runes: true) vs compatibility | Compatibility mode | Allows both $: and $derived syntax during gradual migration |
 | Vite version | Keep v3 vs upgrade to v7 | Upgrade to v7 | Required for Svelte 5 plugin peer dependencies |
 | Tailwind PostCSS plugin | tailwindcss vs @tailwindcss/postcss | @tailwindcss/postcss | Tailwind v4 moved plugin to separate package |
+| Component patterns | Custom vs shadcn-svelte | shadcn-svelte | Industry-standard patterns, Svelte 5 runes, clean API |
+| Button variants | 3 vs 4 vs 5 variants | 4 variants | default, secondary, ghost, destructive covers all use cases |
+| Card transparency | Solid vs semi-transparent | Semi-transparent | Matches macOS vibrancy aesthetic with backdrop-blur |
+| Component exports | Direct vs barrel | Barrel exports | Clean imports, better tree-shaking, maintainable API surface |
 
 ## Blockers
 
@@ -103,6 +108,7 @@ None currently.
 - `.planning/phases/03-progress-display/03-04-SUMMARY.md` - Plan 03-04 completion summary
 - `.planning/phases/03-progress-display/03-VERIFICATION.md` - Phase 3 verification report
 - `.planning/phases/04-native-macos-ui/04-01-SUMMARY.md` - Plan 04-01 completion summary
+- `.planning/phases/04-native-macos-ui/04-02-SUMMARY.md` - Plan 04-02 completion summary
 
 ## New Artifacts (Phase 1)
 
@@ -151,10 +157,21 @@ None currently.
 - `frontend/src/app.css` - Tailwind imports, global styles, dark/light mode, vibrancy utility
 - `frontend/package.json` - Updated to Svelte 5.48.0, Vite 7.3.1, Tailwind v4.1.18, lucide-svelte
 
+## New Artifacts (Phase 4 - Plan 02)
+
+- `frontend/src/lib/utils.js` - cn() utility for class merging with clsx and tailwind-merge
+- `frontend/src/lib/components/ui/button/button.svelte` - Button component with 4 variants and 4 sizes
+- `frontend/src/lib/components/ui/button/index.js` - Button barrel export
+- `frontend/src/lib/components/ui/card/card.svelte` - Card container component
+- `frontend/src/lib/components/ui/card/card-header.svelte` - Card header subcomponent
+- `frontend/src/lib/components/ui/card/card-title.svelte` - Card title subcomponent
+- `frontend/src/lib/components/ui/card/card-content.svelte` - Card content subcomponent
+- `frontend/src/lib/components/ui/card/index.js` - Card barrel export
+
 ## Session Continuity
 
 Last session: 2026-01-23
-Stopped at: Completed 04-01-PLAN.md (Frontend Foundation)
+Stopped at: Completed 04-02-PLAN.md (shadcn-svelte Components)
 Resume file: None
 
 ## Session Handoff Notes
