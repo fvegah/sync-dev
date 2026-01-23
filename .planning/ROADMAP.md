@@ -2,7 +2,7 @@
 
 **Milestone:** v1.1 - UX Improvements
 **Created:** 2026-01-22
-**Status:** In Progress (Phase 1 Complete)
+**Status:** In Progress (Phase 2 Complete)
 
 ## Milestone Goal
 
@@ -53,32 +53,38 @@ Plans:
 
 ---
 
-### Phase 2: Menu Bar Integration
+### Phase 2: Menu Bar Integration ✓
+**Status:** Complete (2026-01-22)
 **Goal:** App vive en la barra de menú de macOS como una app de sincronización profesional
 
 **Requirements:**
-- [ ] TRAY-01: App se minimiza a system tray al cerrar ventana
-- [ ] TRAY-02: Menú contextual (Sync ahora, Pausar, Abrir, Salir)
-- [ ] TRAY-03: Ícono cambia según estado (idle, sincronizando, error)
+- [x] TRAY-01: App se minimiza a system tray al cerrar ventana
+- [x] TRAY-02: Menú contextual (Sync ahora, Pausar, Abrir, Salir)
+- [x] TRAY-03: Ícono cambia según estado (idle, sincronizando, error)
 
 **Approach:**
-- Investigar Wails v3 para system tray nativo vs NSStatusItem via cgo
-- Template images para íconos (22pt max height, 16x16pt para circular)
-- NSMenu para menú contextual
+- Migrated to Wails v3 for native system tray support
+- Template images for icons (22x22 black + alpha, macOS adapts for dark mode)
+- Wails v3 native menu API for context menu
 
 **Key Files:**
-- `systray.go` - Actualmente deshabilitado, reescribir
-- `app.go` - Manejar cierre de ventana sin terminar app
-- `main.go` - Configurar comportamiento de ventana
+- `main.go` - Wails v3 entry with ActivationPolicyAccessory, tray.NewManager()
+- `app.go` - Tray state updates, IsPaused/Pause/Resume methods
+- `internal/tray/tray.go` - Manager with SetMenu, SetState, AttachWindow
+- `internal/tray/icons.go` - Embedded icons via go:embed
+- `internal/tray/icons/*.png` - 3 template icons (idle, syncing, error)
 
-**Risks:**
-- Wails v2 + fyne.io/systray tiene conflictos conocidos
-- Posible necesidad de migrar a Wails v3
+**Plans:** 3/3 complete
+
+Plans:
+- [x] 02-01-PLAN.md — Wails v3 Migration (window hide-on-close, remove v2)
+- [x] 02-02-PLAN.md — System Tray Implementation (tray manager, context menu, icons)
+- [x] 02-03-PLAN.md — Dynamic Icon States (status→tray state mapping)
 
 **Success Criteria:**
-- [ ] Cerrar ventana minimiza a barra de menú
-- [ ] Ícono muestra 3 estados: idle (check), syncing (flechas animadas), error (!)
-- [ ] Menú tiene: "Sync Now", "Pause/Resume", "Open SyncDev", separador, "Quit"
+- [x] Cerrar ventana minimiza a barra de menú
+- [x] Ícono muestra 3 estados: idle, syncing, error
+- [x] Menú tiene: "Sync Now", "Pause/Resume", "Open SyncDev", separador, "Quit"
 
 ---
 
