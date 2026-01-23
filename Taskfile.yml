@@ -1,0 +1,49 @@
+version: '3'
+
+includes:
+  common: ./build/Taskfile.yml
+
+vars:
+  APP_NAME: "SyncDev"
+  BIN_DIR: "bin"
+  VITE_PORT: '{{.WAILS_VITE_PORT | default 9245}}'
+
+tasks:
+  build:
+    summary: Builds the application
+    cmds:
+      - task: darwin:build
+
+  package:
+    summary: Packages a production build of the application
+    cmds:
+      - task: darwin:package
+
+  run:
+    summary: Runs the application
+    cmds:
+      - task: darwin:run
+
+  dev:
+    summary: Runs the application in development mode
+    cmds:
+      - wails3 dev -config ./build/config.yml -port {{.VITE_PORT}}
+
+  darwin:build:
+    summary: Builds the application for macOS
+    deps:
+      - task: common:build:frontend
+    cmds:
+      - go build -o bin/{{.APP_NAME}} .
+
+  darwin:run:
+    summary: Runs the application on macOS
+    cmds:
+      - ./bin/{{.APP_NAME}}
+
+  darwin:package:
+    summary: Creates macOS .app bundle
+    deps:
+      - task: darwin:build
+    cmds:
+      - echo "Packaging not yet configured"

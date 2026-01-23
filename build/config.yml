@@ -1,0 +1,35 @@
+version: '3'
+
+info:
+  companyName: "SyncDev"
+  productName: "SyncDev"
+  productIdentifier: "com.syncdev.app"
+  description: "Folder Sync for Mac"
+  copyright: "(c) 2026"
+  version: "1.0.0"
+
+dev_mode:
+  root_path: .
+  log_level: info
+  debounce: 1000
+  ignore:
+    dir:
+      - .git
+      - node_modules
+      - frontend
+      - build/bin
+    file:
+      - .DS_Store
+      - .gitignore
+    watched_extension:
+      - "*.go"
+    git_ignore: true
+  executes:
+    - cmd: cd frontend && npm install
+      type: blocking
+    - cmd: cd frontend && npm run dev
+      type: background
+    - cmd: go build -o build/bin/SyncDev .
+      type: blocking
+    - cmd: ./build/bin/SyncDev
+      type: primary

@@ -22,8 +22,8 @@
         SyncNow,
         SyncFolderPair,
         AnalyzeFolderPair
-    } from '../../wailsjs/go/main/App.js';
-    import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime.js';
+    } from '../../bindings/SyncDev/app.js';
+    import { Events } from '@wailsio/runtime';
 
     let isRefreshing = $state(false);
     let isAnalyzing = $state(false);
@@ -34,23 +34,23 @@
     onMount(async () => {
         await loadData();
 
-        EventsOn('sync:status', (data) => {
+        Events.On('sync:status', (data) => {
             syncStatus.set(data);
         });
 
-        EventsOn('sync:progress', (data) => {
+        Events.On('sync:progress', (data) => {
             progressData.set(data);
         });
 
-        EventsOn('sync:event', async (data) => {
+        Events.On('sync:event', async (data) => {
             recentEvents.update(events => [data, ...events].slice(0, 50));
         });
     });
 
     onDestroy(() => {
-        EventsOff('sync:status');
-        EventsOff('sync:progress');
-        EventsOff('sync:event');
+        Events.Off('sync:status');
+        Events.Off('sync:progress');
+        Events.Off('sync:event');
     });
 
     async function loadData() {
@@ -322,8 +322,10 @@
 
     <!-- Preview modal -->
     {#if showPreview}
-        <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" onclick={closePreview} role="dialog" aria-modal="true" tabindex="-1">
-            <div class="bg-slate-800 border border-white/10 rounded-xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl" onclick={(e) => e.stopPropagation()}>
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
+        <div class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50" onclick={closePreview} role="dialog" aria-modal="true">
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
+            <div class="bg-slate-800 border border-white/10 rounded-xl p-6 w-full max-w-lg max-h-[80vh] overflow-y-auto shadow-2xl" onclick={(e) => e.stopPropagation()} role="document">
                 <div class="flex justify-between items-center mb-5">
                     <h3 class="text-xl font-semibold">Sync Preview</h3>
                     <button class="text-slate-500 hover:text-slate-300" onclick={closePreview}>

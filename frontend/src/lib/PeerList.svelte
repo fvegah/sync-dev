@@ -2,8 +2,8 @@
     import { onMount, onDestroy } from 'svelte';
     import { Monitor, RefreshCw, X, Search } from 'lucide-svelte';
     import { peers, pairingState, showModal } from '../stores/app.js';
-    import { GetPeers, GeneratePairingCode, RequestPairing, UnpairPeer, RefreshPeers } from '../../wailsjs/go/main/App.js';
-    import { EventsOn, EventsOff } from '../../wailsjs/runtime/runtime.js';
+    import { GetPeers, GeneratePairingCode, RequestPairing, UnpairPeer, RefreshPeers } from '../../bindings/SyncDev/app.js';
+    import { Events } from '@wailsio/runtime';
 
     let myPairingCode = $state('');
     let searchFilter = $state('');
@@ -37,13 +37,13 @@
 
     onMount(async () => {
         await loadPeers();
-        EventsOn('peers:changed', loadPeers);
+        Events.On('peers:changed', loadPeers);
         // Start initial scan
         startScan();
     });
 
     onDestroy(() => {
-        EventsOff('peers:changed');
+        Events.Off('peers:changed');
         if (scanTimeout) clearTimeout(scanTimeout);
     });
 
@@ -76,7 +76,18 @@
     }
 
     async function generateCode() {
-        myPairingCode = await GeneratePairingCode();
+        try {
+            const code = await GeneratePairingCode();
+            console.log('Generated pairing code:', code);
+            if (code) {
+                myPairingCode = code;
+            } else {
+                alert('Failed to generate pairing code - empty response');
+            }
+        } catch (err) {
+            console.error('Error generating pairing code:', err);
+            alert('Error generating pairing code: ' + err);
+        }
     }
 
     async function startPairing(peer) {

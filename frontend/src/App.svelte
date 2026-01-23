@@ -5,7 +5,7 @@
     import FolderPairs from './lib/FolderPairs.svelte';
     import SyncStatus from './lib/SyncStatus.svelte';
     import SettingsComponent from './lib/Settings.svelte';
-    import { RequestPairing } from '../wailsjs/go/main/App.js';
+    import { RequestPairing } from '../bindings/SyncDev/app.js';
 
     let pairingInputCode = $state('');
 
@@ -102,15 +102,18 @@
 
     <!-- Pairing Modal -->
     {#if $modalState.show && $modalState.type === 'pairing'}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
         <div
             class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
             onclick={handleModalOverlayClick}
             role="dialog"
             aria-modal="true"
         >
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
             <div
                 class="bg-slate-800 border border-white/10 rounded-xl p-6 w-full max-w-md shadow-2xl"
                 onclick={handleModalContentClick}
+                role="document"
             >
                 <h3 class="text-xl font-semibold mb-3">Pair with {$modalState.data?.name}</h3>
                 <p class="text-slate-400 text-sm mb-4">Enter the 6-digit code shown on the other device:</p>

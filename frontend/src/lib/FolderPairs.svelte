@@ -11,7 +11,7 @@
         SelectFolder,
         SyncFolderPair,
         AnalyzeFolderPair
-    } from '../../wailsjs/go/main/App.js';
+    } from '../../bindings/SyncDev/app.js';
 
     let showAddForm = $state(false);
     let selectedPeerId = $state('');
@@ -28,12 +28,17 @@
     });
 
     async function loadData() {
-        const [pairs, peerList] = await Promise.all([
-            GetFolderPairs(),
-            GetPeers()
-        ]);
-        folderPairs.set(pairs || []);
-        peers.set(peerList || []);
+        try {
+            const [pairs, peerList] = await Promise.all([
+                GetFolderPairs(),
+                GetPeers()
+            ]);
+            console.log('FolderPairs loaded:', { pairs, peerList });
+            folderPairs.set(pairs || []);
+            peers.set(peerList || []);
+        } catch (err) {
+            console.error('Error loading folder pairs data:', err);
+        }
     }
 
     function getPeerName(peerId) {
@@ -68,9 +73,14 @@
     }
 
     async function removePair(id) {
-        if (confirm('Remove this folder pair? Files will not be deleted.')) {
+        try {
+            console.log('Removing folder pair:', id);
             await RemoveFolderPair(id);
+            console.log('Folder pair removed, reloading...');
             await loadData();
+        } catch (err) {
+            console.error('Error removing folder pair:', err);
+            alert('Failed to remove: ' + err);
         }
     }
 
@@ -304,13 +314,14 @@
 
     <!-- Preview Modal -->
     {#if showPreview}
+        <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_interactive_supports_focus -->
         <div
             class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
             onclick={handleOverlayClick}
             role="dialog"
             aria-modal="true"
-            tabindex="-1"
         >
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions a11y_no_noninteractive_element_interactions -->
             <div
                 class="bg-slate-800 rounded-xl p-6 min-w-[450px] max-w-[550px] max-h-[80vh] overflow-y-auto border border-white/10"
                 onclick={handleModalClick}

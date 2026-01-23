@@ -11,7 +11,7 @@
         GetAppVersion,
         GetDataDirectory,
         OpenDataDirectory
-    } from '../../wailsjs/go/main/App.js';
+    } from '../../bindings/SyncDev/app.js';
 
     let deviceName = $state('');
     let syncInterval = $state(5);
@@ -89,8 +89,9 @@
         <section class="bg-white/5 border border-white/10 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Device</h3>
             <div>
-                <label class="block text-sm font-medium text-slate-200 mb-2">Device Name</label>
+                <label for="device-name" class="block text-sm font-medium text-slate-200 mb-2">Device Name</label>
                 <input
+                    id="device-name"
                     type="text"
                     bind:value={deviceName}
                     placeholder="My Mac"
@@ -105,9 +106,10 @@
             <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Synchronization</h3>
 
             <div class="mb-5">
-                <label class="block text-sm font-medium text-slate-200 mb-2">Sync Interval</label>
+                <label for="sync-interval" class="block text-sm font-medium text-slate-200 mb-2">Sync Interval</label>
                 <div class="flex items-center gap-4">
                     <input
+                        id="sync-interval"
                         type="range"
                         min="1"
                         max="60"
@@ -136,8 +138,9 @@
         <section class="bg-white/5 border border-white/10 rounded-xl p-5">
             <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Exclusions</h3>
             <div>
-                <label class="block text-sm font-medium text-slate-200 mb-2">Global Exclusion Patterns</label>
+                <label for="exclusions" class="block text-sm font-medium text-slate-200 mb-2">Global Exclusion Patterns</label>
                 <textarea
+                    id="exclusions"
                     bind:value={exclusionsText}
                     placeholder=".DS_Store
 .git
