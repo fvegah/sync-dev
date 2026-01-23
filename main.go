@@ -2,11 +2,10 @@ package main
 
 import (
 	"embed"
+	"log"
 
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 //go:embed all:frontend/dist
@@ -14,41 +13,56 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	appInstance := NewApp()
 
 	// Create application with options
-	err := wails.Run(&options.App{
+	app := application.New(application.Options{
+		Name:        "SyncDev",
+		Description: "Folder Sync for Mac",
+		Assets: application.AssetOptions{
+			Handler: application.AssetFileServerFS(assets),
+		},
+		Mac: application.MacOptions{
+			// ActivationPolicyAccessory will be added in Plan 02-02
+			// For now, keep as regular app
+		},
+	})
+
+	// Create main window
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:     "SyncDev",
 		Width:     1024,
 		Height:    700,
 		MinWidth:  800,
 		MinHeight: 600,
-		AssetServer: &assetserver.Options{
-			Assets: assets,
-		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
-		Mac: &mac.Options{
-			TitleBar: &mac.TitleBar{
-				TitlebarAppearsTransparent: true,
-				HideTitle:                  false,
-				HideTitleBar:               false,
-				FullSizeContent:            true,
-				UseToolbar:                 false,
+		Mac: application.MacWindow{
+			TitleBar: application.MacTitleBar{
+				AppearsTransparent: true,
+				FullSizeContent:    true,
 			},
-			Appearance: mac.NSAppearanceNameDarkAqua,
-			About: &mac.AboutInfo{
-				Title:   "SyncDev",
-				Message: "Folder Sync for Mac - Version 1.0.0",
-			},
-		},
-		Bind: []interface{}{
-			app,
+			Appearance: application.NSAppearanceNameDarkAqua,
 		},
 	})
 
-	if err != nil {
-		println("Error:", err.Error())
+	// Hide instead of close - KEY for tray behavior
+	window.RegisterHook(events.Common.WindowClosing, func(e *application.WindowEvent) {
+		window.Hide()
+		e.Cancel()
+	})
+
+	// Register app as a service for frontend bindings
+	app.RegisterService(application.NewService(appInstance))
+
+	// OnStartup equivalent
+	appInstance.startup(app, window)
+
+	// Register shutdown handler
+	app.OnShutdown(func() {
+		appInstance.shutdown()
+	})
+
+	// Run the application
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
 	}
 }
