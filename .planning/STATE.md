@@ -1,8 +1,8 @@
 # Project State
 
-**Last Updated:** 2026-01-22
-**Current Phase:** 2 of 4 (Menu Bar Integration)
-**Status:** Phase 2 Verified
+**Last Updated:** 2026-01-23
+**Current Phase:** 3 of 4 (Progress Display)
+**Status:** In Progress
 
 ## Quick Context
 
@@ -20,17 +20,18 @@ SyncDev es una app de sincronizacion de archivos peer-to-peer para macOS constru
 |-------|------|--------|----------|
 | 1 | Keychain Security | Verified | 2/2 plans |
 | 2 | Menu Bar Integration | Verified | 3/3 plans |
-| 3 | Progress Display | Not Started | 0/4 reqs |
+| 3 | Progress Display | In Progress | 1/4 plans |
 | 4 | Native macOS UI | Not Started | 0/2 reqs |
 
-Progress: [####################..........] 62.5%
+Progress: [########################......] 75%
 
 ## Next Action
 
-Phase 2 verified with 11/11 must-haves passed. Ready to start Phase 3 (Progress Display) - run `/gsd:plan-phase phase:03-progress-display`.
+Continue Phase 3 - execute plan 03-02 (Engine Integration) with `/gsd:execute-phase`.
 
 ## Recent Activity
 
+- 2026-01-23: Completed 03-01-PLAN.md (Progress Backend Infrastructure) - ProgressAggregator with throttled emissions
 - 2026-01-22: Phase 2 verified - 11/11 must-haves passed (02-VERIFICATION.md)
 - 2026-01-22: Completed 02-03-PLAN.md (Dynamic State Icons) - tray icon updates based on sync status
 - 2026-01-22: Completed 02-02-PLAN.md (System Tray Implementation) - native systray with context menu
@@ -49,6 +50,10 @@ Phase 2 verified with 11/11 must-haves passed. Ready to start Phase 3 (Progress 
 
 | Decision | Options Considered | Choice | Rationale |
 |----------|-------------------|--------|-----------|
+| Throttle frequency | 10 Hz / 15 Hz / 20 Hz | 15 Hz (66ms) | Balance between UI responsiveness and CPU usage |
+| Smoothing alpha | 0.05 / 0.1 / 0.3 | 0.1 | Smooth enough to avoid jitter, responsive enough to show changes |
+| ETA threshold | 1% / 5% / 10% | 5% | Prevents wild estimates at start while showing ETA early enough |
+| Max active files | 5 / 10 / 20 | 10 | Sufficient detail without overwhelming payload size |
 | System tray approach | fyne.io/systray vs Wails v3 vs cgo NSStatusItem | Wails v3 | Native systray support, eliminates main thread conflicts, future-proof |
 | Systray API | app.NewSystemTray() vs app.SystemTray.New() | app.SystemTray.New() | Wails v3 manager pattern |
 | Icon generation | ImageMagick vs Go program | Go program | ImageMagick not available, portable solution |
@@ -79,6 +84,7 @@ None currently.
 - `.planning/phases/02-menu-bar-integration/02-02-SUMMARY.md` - Plan 02-02 completion summary
 - `.planning/phases/02-menu-bar-integration/02-03-SUMMARY.md` - Plan 02-03 completion summary
 - `.planning/phases/02-menu-bar-integration/02-VERIFICATION.md` - Phase 2 verification report
+- `.planning/phases/03-progress-display/03-01-SUMMARY.md` - Plan 03-01 completion summary
 
 ## New Artifacts (Phase 1)
 
@@ -105,10 +111,15 @@ None currently.
 
 - `app.go` - Updated with tray.SetState calls in status and event callbacks
 
+## New Artifacts (Phase 3 - Plan 01)
+
+- `internal/models/progress.go` - AggregateProgress and FileProgress structs
+- `internal/sync/progress.go` - ProgressAggregator with throttling and smoothing
+
 ## Session Continuity
 
-Last session: 2026-01-22
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-01-23
+Stopped at: Completed 03-01-PLAN.md
 Resume file: None
 
 ## Session Handoff Notes
@@ -117,7 +128,7 @@ Para continuar en una nueva sesion:
 1. Leer este archivo para contexto rapido
 2. Revisar ROADMAP.md para entender las fases
 3. Ejecutar `/gsd:progress` para ver estado actual
-4. Phase 2 verified - start Phase 3 with `/gsd:plan-phase phase:03-progress-display`
+4. Continue Phase 3 with `/gsd:execute-phase` for plan 03-02
 
 ---
 
